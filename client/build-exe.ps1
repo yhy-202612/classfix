@@ -37,6 +37,10 @@ if (Test-Path -LiteralPath $gooseHelper -PathType Leaf) {
     $toolDirectory = Join-Path $output 'tools'
     New-Item -ItemType Directory -Force -Path $toolDirectory | Out-Null
     Copy-Item -LiteralPath $gooseHelper -Destination $toolDirectory
+    $gooseMod = Join-Path $PSScriptRoot 'desktop_goose\dist\EveTechGooseMod.dll'
+    if (Test-Path -LiteralPath $gooseMod -PathType Leaf) {
+        Copy-Item -LiteralPath $gooseMod -Destination $toolDirectory
+    }
 }
 if ($FFprobeBundle) {
     $FFprobeBundle = [IO.Path]::GetFullPath($FFprobeBundle)

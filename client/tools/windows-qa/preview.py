@@ -50,7 +50,7 @@ def desktop_pet_status(window):
 def pet_bounds(pid):
     children = {
         child.pid for child in psutil.Process(pid).children()
-        if child.name().casefold() == "evetechgoose.exe"
+        if child.name().casefold() == "goosedesktop.exe"
     }
     positions = []
 
@@ -61,7 +61,7 @@ def pet_bounds(pid):
         if owner.value in children and user.IsWindowVisible(hwnd):
             rect = wintypes.RECT()
             if user.GetWindowRect(hwnd, ctypes.byref(rect)):
-                if 125 <= rect.right - rect.left <= 250 and 110 <= rect.bottom - rect.top <= 225:
+                if rect.right - rect.left > 500 and rect.bottom - rect.top > 400:
                     positions.append((rect.left, rect.top, rect.right, rect.bottom))
         return True
 
@@ -80,7 +80,8 @@ def visible_goose(pid, before):
         orange = sum(r > 200 and 75 < g < 200 and b < 90 for r, g, b in pixels)
         white = sum(r > 229 and g > 229 and b > 229 for r, g, b in pixels)
         if orange >= 8 and white >= 45:
-            return screen, box, orange, white
+            return screen, (box[0] + changed[0], box[1] + changed[1],
+                            box[0] + changed[2], box[1] + changed[3]), orange, white
     return None
 
 
@@ -91,6 +92,11 @@ def main():
         window = wait_for(lambda: current_app(child.pid), 30)
         if not window:
             raise RuntimeError("EveTech did not open an interactive window")
+        prompt = wait_for(lambda: next(
+            (w for w in Desktop(backend="uia").windows() if w.window_text() == "Mod Enabler Warning"), None))
+        if not prompt:
+            raise RuntimeError("Original Desktop Goose did not ask to enable its Mod")
+        control(prompt, "Yes").click_input()
         window.set_focus()
         settings = wait_for(lambda: control(window, "\u8bbe\u7f6e"))
         if not settings:

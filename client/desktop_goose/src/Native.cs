@@ -46,6 +46,8 @@ namespace ClassroomGoose
         internal static extern bool IsWindowEnabled(IntPtr window);
         [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
         private static extern int GetWindowLong(IntPtr window, int index);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+        private static extern int SetWindowLong(IntPtr window, int index, int value);
         [DllImport("user32.dll")]
         internal static extern bool IsIconic(IntPtr window);
         [DllImport("user32.dll")]
@@ -105,6 +107,13 @@ namespace ClassroomGoose
         internal static void RaiseWithoutFocus(IntPtr window)
         {
             SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, NoMove | NoSize | NoActivatePosition);
+        }
+
+        internal static void SetGooseWindowStyle(IntPtr window, bool clickThrough)
+        {
+            const int extendedStyle = -20;
+            int style = GetWindowLong(window, extendedStyle) | NoActivate | ToolWindow;
+            SetWindowLong(window, extendedStyle, clickThrough ? style | Transparent : style & ~Transparent);
         }
 
         internal static IntPtr SlideshowWindow()

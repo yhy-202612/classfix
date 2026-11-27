@@ -56,15 +56,8 @@ namespace ClassroomGoose
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
 
-                    string folder = settings.Folder;
-                    stage = "loading GooseModdingAPI.dll";
-                    if (StockFiles.Validate(folder))
-                        StockFiles.BindApi(folder);
-                    else
-                        folder = null;
-
                     stage = "initializing the desktop pet";
-                    using (var app = new GooseApplication(folder, settings))
+                    using (var app = new GooseApplication(null, settings))
                     using (var dispatcher = new Control())
                     {
                         app.CircleRequested += () => Send(output, json, "circle_screen", "");
@@ -75,7 +68,7 @@ namespace ClassroomGoose
                         dispatcher.BeginInvoke(new MethodInvoker(delegate
                         {
                             Send(output, json, "ready", settings.Goose ? app.VisibilityStatus : "Touch keyboard helper is ready.");
-                            var reader = new Thread(() => Listen(input, app, dispatcher, preview))
+                            var reader = new Thread(() => Listen(input, app, dispatcher, preview, app.ExitThread))
                             {
                                 IsBackground = true,
                                 Name = "EveTech desktop pet commands"
@@ -90,6 +83,52 @@ namespace ClassroomGoose
                 {
                     Send(output, json, "error", StartupError(error, stage));
                 }
+            }
+        }
+
+        internal static void StartMod(string name, IGoose goose, Form form)
+        {
+            var reader = new Thread(() =>
+            {
+                using (var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous))
+                {
+                    try
+                    {
+                        pipe.Connect(5000);
+                        RunMod(pipe, goose, form);
+                    }
+                    catch (TimeoutException) { }
+                    catch (IOException) { }
+                    catch (InvalidOperationException) { }
+                    finally
+                    {
+                        try { if (!form.IsDisposed) form.BeginInvoke(new MethodInvoker(form.Close)); }
+                        catch (InvalidOperationException) { }
+                    }
+                }
+            }) { IsBackground = true, Name = "EveTech desktop pet commands" };
+            reader.Start();
+        }
+
+        private static void RunMod(Stream pipe, IGoose goose, Form form)
+        {
+            using (var input = new StreamReader(pipe, Encoding.UTF8, false, 1024, true))
+            using (var output = new StreamWriter(pipe, new UTF8Encoding(false), 1024, true) { AutoFlush = true })
+            {
+                var json = new JavaScriptSerializer { MaxJsonLength = 16384 };
+                HostMessage settings = Read(input, json);
+                if (settings == null || settings.Action != "configure") return;
+                var app = (GooseApplication)form.Invoke(new Func<GooseApplication>(() =>
+                {
+                    var context = new GooseApplication(goose, settings);
+                    context.CircleRequested += () => Send(output, json, "circle_screen", "");
+                    context.VisibilityChanged += message => Send(output, json, "visibility", message);
+                    form.FormClosed += delegate { context.Dispose(); };
+                    Send(output, json, "ready", context.VisibilityStatus);
+                    return context;
+                }));
+                Listen(input, app, form, command =>
+                    Send(output, json, "preview", app.Preview(new IntPtr(command.Window))), form.Close);
             }
         }
 
@@ -109,7 +148,8 @@ namespace ClassroomGoose
                    ", 0x" + error.HResult.ToString("X8") + component + ").";
         }
 
-        private static void Listen(StreamReader input, GooseApplication app, Control dispatcher, Action<HostMessage> preview)
+        private static void Listen(StreamReader input, GooseApplication app, Control dispatcher,
+            Action<HostMessage> preview, Action stop)
         {
             try
             {
@@ -137,7 +177,7 @@ namespace ClassroomGoose
             catch (ArgumentException) { }
             finally
             {
-                try { if (!dispatcher.IsDisposed) dispatcher.BeginInvoke(new MethodInvoker(app.ExitThread)); }
+                try { if (!dispatcher.IsDisposed) dispatcher.Invoke(new MethodInvoker(stop)); }
                 catch (InvalidOperationException) { }
             }
         }

@@ -6,69 +6,6 @@ using System.Windows.Forms;
 
 namespace ClassroomGoose
 {
-    internal sealed class GooseWindow : Form
-    {
-        private readonly IGoose goose;
-        private Rectangle clip;
-        internal event Action<Point> Tapped;
-
-        internal GooseWindow(IGoose goose)
-        {
-            this.goose = goose;
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
-            FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = false;
-            TopMost = true;
-            StartPosition = FormStartPosition.Manual;
-            ClientSize = new Size(150, 134);
-            BackColor = Color.FromArgb(255, 0, 255);
-            TransparencyKey = BackColor;
-            AutoScaleMode = AutoScaleMode.None;
-            AccessibleName = "Ask Goose";
-        }
-
-        protected override bool ShowWithoutActivation { get { return true; } }
-
-        protected override CreateParams CreateParams
-        {
-            get
-            {
-                var parameters = base.CreateParams;
-                parameters.ExStyle |= Native.NoActivate | Native.ToolWindow;
-                return parameters;
-            }
-        }
-
-        internal void UpdatePose(Rectangle screen)
-        {
-            clip = screen;
-            Point at = goose.Position;
-            Location = new Point(at.X - 75, at.Y - 70);
-            if (!Bounds.IntersectsWith(screen))
-            {
-                Hide();
-                return;
-            }
-            if (!Visible) Show();
-            Invalidate();
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.TranslateTransform(-Left, -Top);
-            e.Graphics.SetClip(clip);
-            goose.Draw(e.Graphics);
-        }
-
-        protected override void OnMouseClick(MouseEventArgs e)
-        {
-            base.OnMouseClick(e);
-            if (e.Button == MouseButtons.Left && Tapped != null)
-                Tapped(goose.Beak);
-        }
-    }
-
     internal sealed class ChatWindow : Form
     {
         private readonly TextBox editor;

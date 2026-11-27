@@ -10,7 +10,7 @@ from uuid import uuid4
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 from PySide6.QtNetwork import QLocalServer
 
-from .goose_install import original_goose_available
+from .goose_install import GooseInstallError, original_goose_available, prepare_classroom_goose
 from .update import install_root
 
 
@@ -64,6 +64,7 @@ class DesktopGoose(QObject):
         self._ask_pending = False
         self._preview_window = None
         self._folder = None
+        self._runtime = None
         self._last_config = None
         self._output = bytearray()
         self._reported_error = False
@@ -75,13 +76,17 @@ class DesktopGoose(QObject):
         self._preview_wait.setSingleShot(True)
         self._preview_wait.setInterval(8000)
         self._preview_wait.timeout.connect(self._preview_timeout)
+        self._startup_wait = QTimer(self)
+        self._startup_wait.setSingleShot(True)
+        self._startup_wait.setInterval(60000)
+        self._startup_wait.timeout.connect(self._preview_timeout)
 
         self.process = QProcess(self)
-        self.process.setProgram(str(self.executable))
         environment = QProcessEnvironment.systemEnvironment()
         for name in ("EVETECH_AI_KEY", "CLASSFIX_AI_KEY", "DEEPSEEK_API_KEY"):
             environment.remove(name)
-        self.process.setProcessEnvironment(environment)
+        environment.remove("EVETECH_GOOSE_PIPE")
+        self._environment = environment
         self.process.started.connect(self._send_configuration)
         self.process.readyReadStandardError.connect(self.process.readAllStandardError)
         self.process.errorOccurred.connect(self._handle_error)
@@ -124,13 +129,13 @@ class DesktopGoose(QObject):
             self._clear_preview()
             self.status.emit("The desktop pet helper is missing. Extract the complete EveTech Windows package.")
             return
-        folder = self.settings.get("desktop_goose_folder", "")
+        folder = self.settings.get("desktop_goose_folder", "") if self.goose_enabled() else ""
         if self.process.state() != QProcess.ProcessState.NotRunning and folder != self._folder:
             pending = self._ask_pending, self._preview_window
             self._stop()
             self._ask_pending, self._preview_window = pending
             if self._preview_window is not None:
-                self._preview_wait.start()
+                self._preview_wait.start(60000)
         if self.process.state() == QProcess.ProcessState.NotRunning:
             self._close_pipe()
             if not self._pipe.listen("EveTechGoose-" + uuid4().hex):
@@ -140,8 +145,28 @@ class DesktopGoose(QObject):
             self._folder = folder
             self._output.clear()
             self._reported_error = False
-            self.process.setArguments(["--evetech", self._pipe.serverName()])
-            self.status.emit("Starting the desktop pet helper…")
+            environment = QProcessEnvironment(self._environment)
+            if self.goose_enabled():
+                try:
+                    self._runtime = prepare_classroom_goose(folder, self.executable.with_name("EveTechGooseMod.dll"))
+                except GooseInstallError as error:
+                    self._close_pipe()
+                    self._clear_preview()
+                    self.status.emit(str(error))
+                    return
+                root = Path(self._runtime.name).resolve()
+                environment.insert("EVETECH_GOOSE_PIPE", self._pipe.serverName())
+                self.process.setProgram(str(root / "GooseDesktop.exe"))
+                self.process.setWorkingDirectory(str(root))
+                self.process.setArguments([])
+                self.status.emit("Approve the original Desktop Goose Mod prompt to start the classroom goose.")
+                self._startup_wait.start()
+            else:
+                self.process.setProgram(str(self.executable))
+                self.process.setWorkingDirectory(str(self.executable.parent))
+                self.process.setArguments(["--evetech", self._pipe.serverName()])
+                self.status.emit("Starting the touch keyboard helper…")
+            self.process.setProcessEnvironment(environment)
             self.process.start()
         elif self.process.state() == QProcess.ProcessState.Running:
             self._send_configuration()
@@ -166,7 +191,7 @@ class DesktopGoose(QObject):
             self.status.emit("Enable Desktop Goose, choose the extracted v0.31 folder, and save Settings first.")
             return
         self._preview_window = int(window)
-        self._preview_wait.start()
+        self._preview_wait.start(60000)
         if self._ready:
             self._send_preview()
         else:
@@ -175,7 +200,7 @@ class DesktopGoose(QObject):
 
     def _send_preview(self):
         self.status.emit("Requesting Desktop Goose preview…")
-        self._preview_wait.start()
+        self._preview_wait.start(8000)
         self._send({"Action": "preview", "Window": self._preview_window})
 
     def _clear_preview(self):
@@ -185,7 +210,7 @@ class DesktopGoose(QObject):
     def _preview_timeout(self):
         message = ("The desktop pet helper did not answer the preview request. Try Preview Goose again."
                    if self._ready else
-                   "The desktop pet helper did not finish starting. Try Preview Goose again.")
+                   "Desktop Goose did not load the classroom Mod. Try again and approve its Mod prompt.")
         self._stop()
         self.status.emit(message)
 
@@ -246,6 +271,7 @@ class DesktopGoose(QObject):
                 continue
             if result.get("kind") == "ready":
                 self._ready = True
+                self._startup_wait.stop()
                 if self._preview_window is None:
                     self.status.emit(result.get("message") or "Desktop pet helper is ready.")
                 if self._ask_pending:
@@ -271,6 +297,7 @@ class DesktopGoose(QObject):
     def _handle_error(self, error):
         if not self._stopping and error == QProcess.ProcessError.FailedToStart:
             self._close_pipe()
+            self._remove_runtime()
             self._ready = False
             self._reported_error = True
             self._clear_preview()
@@ -279,6 +306,7 @@ class DesktopGoose(QObject):
     def _finished(self, exit_code, _exit_status):
         self._read_output()
         self._close_pipe()
+        self._remove_runtime()
         was_ready = self._ready
         self._ready = False
         self._last_config = None
@@ -287,6 +315,15 @@ class DesktopGoose(QObject):
             when = "during startup" if not was_ready else "while running"
             self.status.emit(f"The desktop pet helper exited {when} (0x{exit_code & 0xFFFFFFFF:08X}). "
                              "Try Preview Goose again.")
+
+    def _remove_runtime(self):
+        self._startup_wait.stop()
+        if self._runtime is not None:
+            runtime, self._runtime = self._runtime, None
+            try:
+                runtime.cleanup()
+            except OSError:
+                pass
 
     def _stop(self):
         self._ask_pending = False

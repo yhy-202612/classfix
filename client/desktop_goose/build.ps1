@@ -21,8 +21,11 @@ $refs += @('UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll')
 $refs += '/r:' + $gooseApi
 $source = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' -File | ForEach-Object { $_.FullName })
 $app = Join-Path $dist 'EveTechGoose.exe'
+$mod = Join-Path $dist 'EveTechGooseMod.dll'
 $smoke = Join-Path $dist 'Smoke.exe'
 & $csc /nologo /langversion:5 /optimize+ /target:winexe "/out:$app" @refs @source
 if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
+& $csc /nologo /langversion:5 /optimize+ /target:library "/out:$mod" @refs @source
+if ($LASTEXITCODE -ne 0) { throw 'Desktop Goose Mod build failed.' }
 & $csc /nologo /langversion:5 /optimize+ /target:exe /main:ClassroomGoose.Smoke "/out:$smoke" @refs @source (Join-Path $PSScriptRoot 'tests\Smoke.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Smoke test build failed.' }
