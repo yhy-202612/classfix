@@ -1,6 +1,6 @@
 # 第三方组件
 
-ClassFix 的目录式发布包使用未修改的 Python、PySide6 Essentials / Shiboken6、psutil、comtypes、pycaw 和 PyInstaller 运行时。Qt DLL 与 Qt for Python 二进制模块作为独立文件放在 `_internal` 内。可从同版本源码重新构建，或在与其兼容的 Qt for Python 环境运行随附的 ClassFix 源码。
+EveTech 的目录式发布包使用未修改的 Python、PySide6 Essentials / Shiboken6、psutil、comtypes、pycaw 和 PyInstaller 运行时。Qt DLL 与 Qt for Python 二进制模块作为独立文件放在 `_internal` 内。可从同版本源码重新构建，或在与其兼容的 Qt for Python 环境运行随附的 EveTech 源码。
 
 - Python 3.13.15 · [源码与许可证](https://www.python.org/downloads/release/python-31315/)
 - Qt 6.8.3 · [源码](https://download.qt.io/archive/qt/6.8/6.8.3/single/) · [许可证](https://doc.qt.io/qt-6.8/licensing.html)

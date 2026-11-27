@@ -2,7 +2,7 @@
 
 回归背景（1.3.2 及更早）：更新只有「下 67 MB 全包」一条路。实测跨 6 个版本，
 解压后 177 MB 里 199 个文件 / 92.3 MB 完全没变（Qt 与 Python 运行时），
-真正变化的只有 ClassFix.exe 与 base_library.zip，约 3.8 MB。
+真正变化的只有 EveTech.exe 与 base_library.zip，约 3.8 MB。
 
 本文件守住三条红线：
 1. 运行时指纹不一致（换了 Python / PySide6）绝不能走差异包——否则 dll 与 pyd 混搭一启动就崩；
@@ -17,15 +17,15 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from classfix import delta
-from classfix import update as update_module
+from evetech import delta
+from evetech import update as update_module
 
 RUNTIME = {"python": "3.12", "pyside6": "6.8.3", "arch": "x64", "onedir": True}
 
 
 def make_patch_zip(path, files, keep=None, deletes=None, from_version="1.3.2", to_version="1.4.0",
                    runtime=None):
-    """造一个结构真实的差异包：patch.json + ClassFix/<变更文件>。"""
+    """造一个结构真实的差异包：patch.json + EveTech/<变更文件>。"""
     meta = {
         "from": from_version,
         "to": to_version,
@@ -38,7 +38,7 @@ def make_patch_zip(path, files, keep=None, deletes=None, from_version="1.3.2", t
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("patch.json", json.dumps(meta, ensure_ascii=False))
         for name, data in files.items():
-            archive.writestr("ClassFix/" + name, data)
+            archive.writestr("EveTech/" + name, data)
     return meta
 
 
@@ -46,7 +46,7 @@ def make_install(root, version="1.3.2", runtime=None, files=None):
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     payload = {"version": version, "runtime": RUNTIME if runtime is None else runtime}
-    (root / "classfix-package.json").write_text(json.dumps(payload), encoding="utf-8")
+    (root / "evetech-package.json").write_text(json.dumps(payload), encoding="utf-8")
     for name, data in (files or {}).items():
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -84,7 +84,7 @@ class ProcessRuntimeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "install"
             root.mkdir()
-            (root / "classfix-package.json").write_text(json.dumps({"version": "1.3.2"}), encoding="utf-8")
+            (root / "evetech-package.json").write_text(json.dumps({"version": "1.3.2"}), encoding="utf-8")
             runtime = delta.local_runtime(root)
         self.assertEqual(runtime["python"], delta.runtime_from_process()["python"])
 
@@ -157,7 +157,7 @@ class PatchMetaTest(unittest.TestCase):
     def test_reads_meta(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "p.zip"
-            make_patch_zip(path, {"ClassFix.exe": b"new"})
+            make_patch_zip(path, {"EveTech.exe": b"new"})
             meta = delta.read_patch_meta(path)
             self.assertEqual(meta["to"], "1.4.0")
 
@@ -165,7 +165,7 @@ class PatchMetaTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "p.zip"
             with zipfile.ZipFile(path, "w") as archive:
-                archive.writestr("ClassFix/ClassFix.exe", b"x")
+                archive.writestr("EveTech/EveTech.exe", b"x")
             with self.assertRaises(ValueError):
                 delta.read_patch_meta(path)
 
@@ -174,22 +174,22 @@ class VerifyPayloadTest(unittest.TestCase):
     def test_payload_matches(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "p.zip"
-            meta = make_patch_zip(path, {"ClassFix.exe": b"new-bytes"})
+            meta = make_patch_zip(path, {"EveTech.exe": b"new-bytes"})
             payload = Path(tmp) / "payload"
-            (payload / "ClassFix").mkdir(parents=True)
-            (payload / "ClassFix" / "ClassFix.exe").write_bytes(b"new-bytes")
-            ok, problems = delta.verify_payload(payload / "ClassFix", meta)
+            (payload / "EveTech").mkdir(parents=True)
+            (payload / "EveTech" / "EveTech.exe").write_bytes(b"new-bytes")
+            ok, problems = delta.verify_payload(payload / "EveTech", meta)
         self.assertTrue(ok, problems)
 
     def test_tampered_payload_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            meta = make_patch_zip(Path(tmp) / "p.zip", {"ClassFix.exe": b"new-bytes"})
-            payload = Path(tmp) / "payload" / "ClassFix"
+            meta = make_patch_zip(Path(tmp) / "p.zip", {"EveTech.exe": b"new-bytes"})
+            payload = Path(tmp) / "payload" / "EveTech"
             payload.mkdir(parents=True)
-            (payload / "ClassFix.exe").write_bytes(b"tampered")
+            (payload / "EveTech.exe").write_bytes(b"tampered")
             ok, problems = delta.verify_payload(payload, meta)
         self.assertFalse(ok)
-        self.assertTrue(any("ClassFix.exe" in item for item in problems))
+        self.assertTrue(any("EveTech.exe" in item for item in problems))
 
 
 class KeepTest(unittest.TestCase):
@@ -228,8 +228,8 @@ class ManifestScanTest(unittest.TestCase):
             root = Path(tmp)
             (root / "a.dll").write_bytes(b"1")
             (root / "update").mkdir()
-            (root / "update" / "ClassFix-1.4.0-Windows-x64.zip").write_bytes(b"2")
-            (root / "ClassFix-update.log").write_bytes(b"3")
+            (root / "update" / "EveTech-1.4.0-Windows-x64.zip").write_bytes(b"2")
+            (root / "EveTech-update.log").write_bytes(b"3")
             names = set(delta.file_manifest(root))
         self.assertEqual(names, {"a.dll"})
 
@@ -260,7 +260,7 @@ class StagePatchTest(unittest.TestCase):
         root = make_install(Path(tmp) / "install",
                             files={"_internal/Qt6Core.dll": b"q" * 32})
         patch = Path(tmp) / "p.zip"
-        meta = make_patch_zip(patch, files or {"ClassFix.exe": b"new-exe"},
+        meta = make_patch_zip(patch, files or {"EveTech.exe": b"new-exe"},
                               keep={"_internal/Qt6Core.dll": 32}, deletes=["old/gone.dll"],
                               **patch_kwargs)
         inner, script = update_module.stage_patch(patch, "1.4.0", root=root, current_version="1.3.2")
@@ -269,16 +269,16 @@ class StagePatchTest(unittest.TestCase):
     def test_stages_patch_and_writes_deletes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root, inner, script, meta = self.stage(tmp)
-            self.assertTrue((inner / "ClassFix.exe").is_file())
+            self.assertTrue((inner / "EveTech.exe").is_file())
             text = script.read_text(encoding="utf-8")
             self.assertIn("old\\gone.dll", text)
-            self.assertIn("ClassFix.exe", text)
+            self.assertIn("EveTech.exe", text)
 
     def test_wrong_from_version_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = make_install(Path(tmp) / "install")
             patch = Path(tmp) / "p.zip"
-            make_patch_zip(patch, {"ClassFix.exe": b"x"}, from_version="1.0.0")
+            make_patch_zip(patch, {"EveTech.exe": b"x"}, from_version="1.0.0")
             with self.assertRaises(update_module.UpdateError):
                 update_module.stage_patch(patch, "1.4.0", root=root, current_version="1.3.2")
 
@@ -287,11 +287,11 @@ class StagePatchTest(unittest.TestCase):
             root = make_install(Path(tmp) / "install",
                                files={"_internal/Qt6Core.dll": b"q" * 32})
             patch = Path(tmp) / "p.zip"
-            make_patch_zip(patch, {"ClassFix.exe": b"right"}, keep={"_internal/Qt6Core.dll": 32})
+            make_patch_zip(patch, {"EveTech.exe": b"right"}, keep={"_internal/Qt6Core.dll": 32})
             # 重新打包：patch.json 里记的哈希还是 right，实际内容被换掉
             with zipfile.ZipFile(patch) as archive:
                 items = {name: archive.read(name) for name in archive.namelist()}
-            items["ClassFix/ClassFix.exe"] = b"tampered"
+            items["EveTech/EveTech.exe"] = b"tampered"
             with zipfile.ZipFile(patch, "w", zipfile.ZIP_DEFLATED) as archive:
                 for name, data in items.items():
                     archive.writestr(name, data)
@@ -303,7 +303,7 @@ class StagePatchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = make_install(Path(tmp) / "install")  # 故意不放 Qt6Core.dll
             patch = Path(tmp) / "p.zip"
-            make_patch_zip(patch, {"ClassFix.exe": b"x"}, keep={"_internal/Qt6Core.dll": 32})
+            make_patch_zip(patch, {"EveTech.exe": b"x"}, keep={"_internal/Qt6Core.dll": 32})
             with self.assertRaises(update_module.UpdateError) as ctx:
                 update_module.stage_patch(patch, "1.4.0", root=root, current_version="1.3.2")
             self.assertIn("不完整", str(ctx.exception))
@@ -314,8 +314,8 @@ class LocalPackageInfoTest(unittest.TestCase):
 
     def test_patch_package_is_recognized(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "ClassFix-1.3.2-to-1.4.0.patch.zip"
-            make_patch_zip(path, {"ClassFix.exe": b"new"}, from_version="1.3.2", to_version="1.4.0")
+            path = Path(tmp) / "EveTech-1.3.2-to-1.4.0.patch.zip"
+            make_patch_zip(path, {"EveTech.exe": b"new"}, from_version="1.3.2", to_version="1.4.0")
             info = update_module.local_package_info(path, current_version="1.3.2")
         self.assertTrue(info["patch"])
         self.assertEqual(info["version"], "1.4.0")
@@ -324,10 +324,10 @@ class LocalPackageInfoTest(unittest.TestCase):
 
     def test_full_package_is_not_marked_as_patch(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "ClassFix-1.4.0-Windows-x64.zip"
+            path = Path(tmp) / "EveTech-1.4.0-Windows-x64.zip"
             with zipfile.ZipFile(path, "w") as archive:
-                archive.writestr("ClassFix/ClassFix.exe", b"exe")
-                archive.writestr("ClassFix/classfix-package.json", json.dumps({"version": "1.4.0"}))
+                archive.writestr("EveTech/EveTech.exe", b"exe")
+                archive.writestr("EveTech/evetech-package.json", json.dumps({"version": "1.4.0"}))
             info = update_module.local_package_info(path, current_version="1.3.2")
         self.assertFalse(info["patch"])
         self.assertEqual(info["version"], "1.4.0")

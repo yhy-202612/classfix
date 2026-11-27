@@ -12,9 +12,9 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from classfix.update import UpdateError
+from evetech.update import UpdateError
 
-PREFERENCES = Path(__file__).resolve().parents[1] / "classfix" / "ui" / "preferences.py"
+PREFERENCES = Path(__file__).resolve().parents[1] / "evetech" / "ui" / "preferences.py"
 
 
 def load_method(class_name, method_name):

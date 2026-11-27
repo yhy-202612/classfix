@@ -342,7 +342,7 @@ def probe_asset(deck, media, ffprobe, *, background=False):
             info = archive.getinfo(media.target)
             if info.file_size > MAX_EXTRACT:
                 return Probe("unavailable", "尚未检测 · 嵌入视频大于 512 MB，可导出为独立文件后探测。")
-            with tempfile.TemporaryDirectory(prefix="classfix-media-") as temporary:
+            with tempfile.TemporaryDirectory(prefix="evetech-media-") as temporary:
                 suffix = Path(media.target).suffix.lower()
                 target = Path(temporary) / ("video" + (suffix if suffix in VIDEO_EXTENSIONS else ".bin"))
                 with archive.open(info) as source, target.open("wb") as destination:

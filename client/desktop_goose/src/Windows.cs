@@ -24,7 +24,7 @@ namespace ClassroomGoose
             BackColor = Color.FromArgb(255, 0, 255);
             TransparencyKey = BackColor;
             AutoScaleMode = AutoScaleMode.None;
-            AccessibleName = "问鹅";
+            AccessibleName = "Ask Goose";
         }
 
         protected override bool ShowWithoutActivation { get { return true; } }
@@ -76,15 +76,26 @@ namespace ClassroomGoose
         private readonly RichTextBox answer;
         private readonly Button send;
         private readonly Button cancel;
+        private readonly Button type;
         private readonly Timer transition = new Timer { Interval = 15 };
         private readonly Stopwatch animation = new Stopwatch();
+        private readonly Stopwatch resizeAnimation = new Stopwatch();
         private Point anchor;
         private Point finalPosition;
+        private Rectangle keyboardBounds;
+        private int startHeight;
+        private int targetHeight;
+        private int startOffset;
+        private double startOpacity;
         private bool tailAtLeft;
         private bool closing;
         private bool attached;
+        private bool typing;
+        private bool waiting;
         internal event Action<string> Submitted;
         internal event Action CancellationRequested;
+        internal event Action CircleRequested;
+        internal event Action TypingRequested;
         internal event Action ClosingBubble;
         internal event Action BubbleHidden;
 
@@ -92,35 +103,47 @@ namespace ClassroomGoose
         {
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
             AutoScaleMode = AutoScaleMode.None;
-            Font = new Font("Microsoft YaHei UI", 10);
+            Font = new Font("Segoe UI", 10);
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
             TopMost = true;
-            Text = "ClassFix · 问鹅";
+            Text = "EveTech · Ask Goose";
             KeyPreview = true;
             BackColor = Color.FromArgb(252, 249, 241);
-            ClientSize = new Size(416, 215);
-            var title = new Label { Text = "问鹅", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Location = new Point(24, 14) };
-            var close = new Button { Text = "关闭", Size = new Size(65, 34), Location = new Point(326, 9), TabStop = false };
+            ClientSize = new Size(416, 110);
+            var title = new Label { Text = "Ask Goose", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Location = new Point(24, 14) };
+            var close = new Button { Text = "Close", Size = new Size(65, 34), Location = new Point(326, 9), TabStop = false };
             close.Click += delegate { Dismiss(true); };
+            var circle = new Button { Text = "Circle Screen", Bounds = new Rectangle(24, 53, 177, 42) };
+            circle.Click += delegate { if (!closing && CircleRequested != null) CircleRequested(); };
+            type = new Button { Text = "Type Question", Bounds = new Rectangle(211, 53, 179, 42) };
+            type.Click += delegate
+            {
+                if (closing) return;
+                typing = true;
+                UpdateContent(true);
+                editor.Focus();
+                if (TypingRequested != null) TypingRequested();
+            };
             editor = new TextBox
             {
                 Multiline = true, AcceptsReturn = true, ScrollBars = ScrollBars.Vertical,
-                MaxLength = DeepSeek.QuestionLimit, Location = new Point(24, 52),
-                Width = 366, Height = 74, AccessibleName = "问题"
+                MaxLength = DeepSeek.QuestionLimit, Location = new Point(24, 108),
+                Width = 366, Height = 74, AccessibleName = "Question"
             };
-            status = new Label { Location = new Point(24, 136), Width = 260, Height = 49, AutoEllipsis = true };
-            send = new Button { Text = "发送", Location = new Point(312, 139), Size = new Size(78, 44) };
+            status = new Label { Location = new Point(24, 192), Width = 260, Height = 49, AutoEllipsis = true };
+            send = new Button { Text = "Send", Location = new Point(312, 195), Size = new Size(78, 44) };
             send.Click += delegate { Submit(); };
-            cancel = new Button { Text = "取消生成", Location = new Point(298, 139), Size = new Size(92, 44), Visible = false };
+            cancel = new Button { Text = "Cancel", Location = new Point(298, 195), Size = new Size(92, 44), Visible = false };
             cancel.Click += delegate { if (CancellationRequested != null) CancellationRequested(); };
             answer = new RichTextBox
             {
                 ReadOnly = true, DetectUrls = false, WordWrap = true, ScrollBars = RichTextBoxScrollBars.Vertical,
-                AccessibleName = "最近回答", Location = new Point(24, 190), Size = new Size(366, 124), Visible = false
+                AccessibleName = "Latest answer", Location = new Point(24, 246), Size = new Size(366, 124), Visible = false
             };
-            Controls.AddRange(new Control[] { title, close, editor, status, send, cancel, answer });
+            Controls.AddRange(new Control[] { title, close, circle, type, editor, status, send, cancel, answer });
+            UpdateContent(false);
             transition.Tick += delegate { Animate(); };
         }
 
@@ -132,37 +155,68 @@ namespace ClassroomGoose
             anchor = source;
             attached = nearGoose;
             closing = false;
+            if (!alreadyOpen)
+            {
+                typing = false;
+                UpdateContent(false);
+            }
             Place(keyboard);
             if (!alreadyOpen)
             {
                 Opacity = 0.12;
+                startOpacity = Opacity;
+                startOffset = 6;
                 Location = Offset(finalPosition, 6);
                 animation.Restart();
                 Show();
                 transition.Start();
             }
             Activate();
-            editor.Focus();
+            if (!alreadyOpen) type.Focus();
         }
 
         internal void SetState(bool waiting, Reply reply)
         {
-            send.Visible = !waiting;
-            cancel.Visible = waiting;
-            status.Text = waiting ? "正在生成…" : reply != null && !reply.CanDeliver ? reply.Text : "";
+            this.waiting = waiting;
+            status.Text = waiting ? "Writing a reply…" : reply != null && !reply.CanDeliver ? reply.Text : "";
             string text = reply != null && reply.CanDeliver ? reply.Text : "";
             if (answer.Text != text) answer.Text = text;
-            answer.Visible = text.Length != 0;
-            int height = text.Length != 0 ? 330 : 197;
-            if (ClientSize.Height != height)
+            UpdateContent(Visible && !closing);
+        }
+
+        private void UpdateContent(bool animate)
+        {
+            editor.Visible = typing;
+            status.Visible = typing;
+            send.Visible = typing && !waiting;
+            cancel.Visible = typing && waiting;
+            bool hasAnswer = answer.TextLength != 0;
+            answer.Visible = typing && hasAnswer;
+            int height = typing ? (hasAnswer ? 386 : 253) : 110;
+            if (animate && ClientSize.Height != height && (!resizeAnimation.IsRunning || targetHeight != height))
             {
-                ClientSize = new Size(ClientSize.Width, height);
-                UpdateShape();
+                startHeight = ClientSize.Height;
+                targetHeight = height;
+                resizeAnimation.Restart();
+                transition.Start();
             }
+            else if (!animate)
+            {
+                resizeAnimation.Reset();
+                ResizeBubble(height);
+            }
+        }
+
+        private void ResizeBubble(int height)
+        {
+            if (ClientSize.Height == height) return;
+            ClientSize = new Size(ClientSize.Width, height);
+            UpdateShape();
         }
 
         internal void Place(Rectangle keyboard)
         {
+            keyboardBounds = keyboard;
             Rectangle work = Screen.FromPoint(anchor).WorkingArea;
             Rectangle blocked = Rectangle.Intersect(work, keyboard);
             int right = anchor.X + 16;
@@ -191,6 +245,7 @@ namespace ClassroomGoose
         internal void Dismiss(bool animate, bool immediate = false)
         {
             if (!Visible) return;
+            if (closing && animate && !immediate) return;
             if (!closing && ClosingBubble != null) ClosingBubble();
             if (!animate || immediate)
             {
@@ -198,22 +253,34 @@ namespace ClassroomGoose
                 return;
             }
             closing = true;
+            startOpacity = Opacity;
+            startOffset = (Left - finalPosition.X) * (tailAtLeft ? -1 : 1);
             animation.Restart();
             transition.Start();
         }
 
         private void Animate()
         {
+            if (resizeAnimation.IsRunning)
+            {
+                double resize = Math.Min(1, resizeAnimation.Elapsed.TotalMilliseconds / 170.0);
+                ResizeBubble(startHeight + (int)Math.Round((targetHeight - startHeight) * Ease(resize)));
+                Place(keyboardBounds);
+                if (resize >= 1) resizeAnimation.Reset();
+            }
             double t = Math.Min(1, animation.Elapsed.TotalMilliseconds / (closing ? 115 : 155));
-            double progress = 1 - Math.Pow(1 - t, 3);
-            Opacity = closing ? Math.Max(.04, 1 - progress) : .12 + progress * .88;
-            Location = Offset(finalPosition, (int)Math.Round(6 * (closing ? progress : 1 - progress)));
-            if (t >= 1)
+            double progress = Ease(t);
+            Opacity = closing ? startOpacity * (1 - progress) : startOpacity + progress * (1 - startOpacity);
+            int endOffset = closing ? 6 : 0;
+            Location = Offset(finalPosition, startOffset + (int)Math.Round((endOffset - startOffset) * progress));
+            if (t >= 1 && (closing || !resizeAnimation.IsRunning))
             {
                 transition.Stop();
                 if (closing) FinishClosing();
             }
         }
+
+        private static double Ease(double progress) { return 1 - Math.Pow(1 - progress, 3); }
 
         private Point Offset(Point position, int pixels)
         {
@@ -223,6 +290,7 @@ namespace ClassroomGoose
         private void FinishClosing()
         {
             transition.Stop();
+            resizeAnimation.Reset();
             Hide();
             closing = false;
             if (BubbleHidden != null) BubbleHidden();
@@ -297,8 +365,8 @@ namespace ClassroomGoose
         internal AnswerCard(string answer, Size available)
         {
             AutoScaleMode = AutoScaleMode.None;
-            Font = new Font("Microsoft YaHei UI", 10);
-            Text = "ClassFix · 鹅送来的回答";
+            Font = new Font("Segoe UI", 10);
+            Text = "EveTech · Answer from Goose";
             StartPosition = FormStartPosition.Manual;
             FormBorderStyle = FormBorderStyle.None;
             BackColor = Color.FromArgb(254, 250, 236);
@@ -307,17 +375,17 @@ namespace ClassroomGoose
             ClientSize = new Size(Math.Min(420, available.Width - 40), Math.Min(260, available.Height - 70));
             var title = new Label
             {
-                Text = "鹅送来的回答", Font = new Font(Font, FontStyle.Bold), AutoSize = true, Location = new Point(16, 14)
+                Text = "Answer from Goose", Font = new Font(Font, FontStyle.Bold), AutoSize = true, Location = new Point(16, 14)
             };
             var body = new RichTextBox
             {
                 Text = answer, ReadOnly = true, DetectUrls = false, ScrollBars = RichTextBoxScrollBars.Vertical,
-                AccessibleName = "回答正文", BorderStyle = BorderStyle.None, BackColor = BackColor,
+                AccessibleName = "Answer", BorderStyle = BorderStyle.None, BackColor = BackColor,
                 Bounds = new Rectangle(16, 46, Width - 32, Height - 106)
             };
-            copy = new Button { Text = "复制", Bounds = new Rectangle(16, Height - 48, 68, 36), Enabled = false };
-            copy.Click += delegate { try { Clipboard.SetText(answer); copy.Text = "已复制"; } catch (System.Runtime.InteropServices.ExternalException) { } };
-            close = new Button { Text = "关闭", Bounds = new Rectangle(Width - 83, Height - 48, 68, 36), Enabled = false };
+            copy = new Button { Text = "Copy", Bounds = new Rectangle(16, Height - 48, 68, 36), Enabled = false };
+            copy.Click += delegate { try { Clipboard.SetText(answer); copy.Text = "Copied"; } catch (System.Runtime.InteropServices.ExternalException) { } };
+            close = new Button { Text = "Close", Bounds = new Rectangle(Width - 83, Height - 48, 68, 36), Enabled = false };
             close.Click += delegate { Close(); };
             Controls.AddRange(new Control[] { title, body, copy, close });
         }

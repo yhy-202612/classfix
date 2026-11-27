@@ -24,7 +24,7 @@ class UndefinedNameTest(unittest.TestCase):
         from pyflakes.reporter import Reporter
 
         out, err = io.StringIO(), io.StringIO()
-        root = Path(__file__).resolve().parents[1] / "classfix"
+        root = Path(__file__).resolve().parents[1] / "evetech"
         self.assertTrue(root.is_dir())
         reporter = Reporter(out, err)
         for file in sorted(root.rglob("*.py")):
@@ -42,7 +42,7 @@ class PreflightContractTest(unittest.TestCase):
         self.root = Path(__file__).resolve().parents[1]
 
     def _product_keys(self):
-        source = (self.root / "classfix" / "preflight.py").read_text(encoding="utf-8")
+        source = (self.root / "evetech" / "preflight.py").read_text(encoding="utf-8")
         keys = set(re.findall(r'Check\(\s*"([a-z_]+)"', source))
         # 音频三项由 inspect_audio 产出，preflight 只按白名单挑选
         picked = re.search(r"check\.key in \((.*?)\)", source, re.S)

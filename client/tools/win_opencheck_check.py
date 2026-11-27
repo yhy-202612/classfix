@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from classfix import opencheck as oc
+from evetech import opencheck as oc
 
 
 def digest(path):

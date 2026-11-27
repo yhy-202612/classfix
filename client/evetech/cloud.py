@@ -1,4 +1,4 @@
-"""ClassFix 云端账号：手机号登录、积分、AI 诊断代理、规则包。
+"""EveTech 云端账号：手机号登录、积分、AI 诊断代理、规则包。
 
 未登录时客户端仍然可以填自己的 API 密钥直连（见 ai.py），这条路径不经过本模块，
 也不消耗积分。
@@ -14,7 +14,7 @@ import urllib.request
 from dataclasses import dataclass, field
 
 DEFAULT_BASE = "https://aiclass.openplays.cn/classfix-api"
-USER_AGENT = "ClassFix/1.2 (Windows)"
+USER_AGENT = "EveTech/1.2 (Windows)"
 TEXT_LIMIT = 512 * 1024
 CACHE_FILE = "cloud-rules.json"
 CACHE_TTL = 24 * 3600
@@ -64,7 +64,7 @@ def call(base, path, payload=None, token="", timeout=30):
             pass
         raise CloudError(message) from error
     except (urllib.error.URLError, OSError) as error:
-        raise CloudError("连不上 ClassFix 云端：%s" % error) from error
+        raise CloudError("连不上 EveTech 云端：%s" % error) from error
     if len(raw) > TEXT_LIMIT:
         raise CloudError("云端响应过大。")
     try:

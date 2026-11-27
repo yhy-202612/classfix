@@ -107,7 +107,7 @@ class LayeredDiagnostics(QObject):
         self._set_log_state("正在连接 Windows 事件日志。")
         Thread(target=subscribe, args=(stop, lambda event: self._log_event.emit(stop, event),
                                       lambda status: self._log_status.emit(stop, status)),
-               name="ClassFix-EventLog", daemon=True).start()
+               name="EveTech-EventLog", daemon=True).start()
 
     def cancel_trace(self):
         if self._trace_stop is not None:

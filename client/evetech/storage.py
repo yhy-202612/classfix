@@ -19,16 +19,24 @@ class Record:
 
 
 def data_directory():
-    base = os.environ.get("CLASSFIX_DATA_DIR")
+    base = os.environ.get("EVETECH_DATA_DIR") or os.environ.get("CLASSFIX_DATA_DIR")
     if base:
         return Path(base)
-    return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "ClassFix"
+    parent = Path(os.environ.get("LOCALAPPDATA") or Path.home())
+    current = parent / "EveTech"
+    legacy = parent / "ClassFix"
+    if not (current / "evetech.sqlite3").exists() and (legacy / "classfix.sqlite3").is_file():
+        return legacy
+    return current
 
 
 class Store:
     def __init__(self, directory):
         directory.mkdir(parents=True, exist_ok=True)
-        self.path = directory / "classfix.sqlite3"
+        self.path = directory / "evetech.sqlite3"
+        legacy = directory / "classfix.sqlite3"
+        if not self.path.exists() and legacy.is_file():
+            self.path = legacy
         with self.open() as db:
             db.execute("""CREATE TABLE IF NOT EXISTS diagnosis (
                          id INTEGER PRIMARY KEY, kind TEXT NOT NULL,

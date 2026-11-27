@@ -1,4 +1,4 @@
-"""把 classfix-package.json 写进打包目录，供「从文件更新」识别版本。"""
+"""把 evetech-package.json 写进打包目录，供「从文件更新」识别版本。"""
 
 import json
 import sys
@@ -8,8 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from classfix import VERSION  # noqa: E402
-from classfix.update import PACKAGE_META  # noqa: E402
+from evetech import VERSION  # noqa: E402
+from evetech.update import PACKAGE_META  # noqa: E402
 
 
 def runtime_fingerprint():

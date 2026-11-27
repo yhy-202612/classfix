@@ -37,7 +37,7 @@ class Page(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ClassFix · 课堂故障诊断与急救助手")
+        self.setWindowTitle("EveTech · 课堂故障诊断与急救助手")
         self.setWindowIcon(icon("logo", size=32))
         self.resize(1180, 805)
         self.setMinimumSize(810, 580)
@@ -61,7 +61,7 @@ class MainWindow(QMainWindow):
         mark.setPixmap(icon("logo", "#2f70c8", 32).pixmap(QSize(32, 32)))
         brand = horizontal(8)
         brand.addWidget(mark)
-        brand.addWidget(label("ClassFix", "brand"), 1)
+        brand.addWidget(label("EveTech", "brand"), 1)
         self.rail_layout.addLayout(brand)
         self.rail_layout.addWidget(label("课堂故障诊断与急救助手", "small"))
         self.rail_layout.addSpacing(19)
@@ -128,7 +128,7 @@ class MainWindow(QMainWindow):
             self.hide()
             tray = getattr(self, "tray", None)
             if tray and not getattr(self, "_hide_notice_shown", False):
-                tray.showMessage("ClassFix 仍在运行", "正在后台监视 PowerPoint。双击托盘图标可重新打开。",
+                tray.showMessage("EveTech 仍在运行", "正在后台监视 PowerPoint。双击托盘图标可重新打开。",
                                  tray.MessageIcon.Information, 3500)
                 self._hide_notice_shown = True
             return

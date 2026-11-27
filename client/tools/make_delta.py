@@ -1,12 +1,12 @@
 """发布时生成差异包：对比两版解压目录，只打包真正变化的文件。
 
-用法（两边的目录都是「含 ClassFix.exe 的那一层」）：
+用法（两边的目录都是「含 EveTech.exe 的那一层」）：
     python tools/make_delta.py --old <旧版目录> --new <新版目录> --out <输出目录>
     python tools/make_delta.py ... --full-size 67759033 --patch-url https://.../x.zip \
         --update-json <update.json 路径>
 
 产出：
-* <out>/<from>-to-<to>.zip       差异包（patch.json + ClassFix/<变更文件>）
+* <out>/<from>-to-<to>.zip       差异包（patch.json + EveTech/<变更文件>）
 * <out>/manifest-<to>.json       新版全量清单（留档核验用）
 * 屏幕打印统计与可直接粘贴的 update.json patches 片段
 
@@ -25,8 +25,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from classfix import delta  # noqa: E402
-from classfix.update import PACKAGE_META, sha256_of  # noqa: E402
+from evetech import delta  # noqa: E402
+from evetech.update import PACKAGE_META, sha256_of  # noqa: E402
 
 
 def read_meta(directory):
@@ -76,7 +76,7 @@ def build(old_dir, new_dir, out_dir, full_size=0, note=""):
     with zipfile.ZipFile(patch_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         archive.writestr(delta.PATCH_META, json.dumps(patch_meta, ensure_ascii=False, indent=1))
         for name in changed:
-            archive.write(new_dir / name, arcname="ClassFix/" + name)
+            archive.write(new_dir / name, arcname="EveTech/" + name)
 
     manifest_path = out_dir / ("manifest-%s.json" % new_version)
     manifest_path.write_text(json.dumps(
@@ -119,9 +119,9 @@ def merge_update_json(path, entry, keep_versions=5, url=None):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="生成 ClassFix 差异更新包")
-    parser.add_argument("--old", required=True, help="旧版目录（含 ClassFix.exe）")
-    parser.add_argument("--new", required=True, help="新版目录（含 ClassFix.exe）")
+    parser = argparse.ArgumentParser(description="生成 EveTech 差异更新包")
+    parser.add_argument("--old", required=True, help="旧版目录（含 EveTech.exe）")
+    parser.add_argument("--new", required=True, help="新版目录（含 EveTech.exe）")
     parser.add_argument("--out", required=True, help="输出目录")
     parser.add_argument("--full-size", type=int, default=0, help="新版完整包字节数，用于判断差异是否过大")
     parser.add_argument("--patch-url", default="", help="差异包上线后的下载地址")

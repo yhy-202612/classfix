@@ -12,7 +12,7 @@ SlideShowWindows），这一点保留在文案里说明。
 
 import unittest
 
-from classfix.preflight import _run_slide_show_probe, probe_presentation_api, probe_verdict
+from evetech.preflight import _run_slide_show_probe, probe_presentation_api, probe_verdict
 
 
 class FakeError(Exception):

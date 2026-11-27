@@ -5,10 +5,10 @@ from pathlib import Path
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QPushButton
 
-import classfix.ui.video as video_module
-from classfix import find
-from classfix.pptx import read_deck
-from classfix.ui.theme import apply_theme
+import evetech.ui.video as video_module
+from evetech import find
+from evetech.pptx import read_deck
+from evetech.ui.theme import apply_theme
 from test_find import build
 
 

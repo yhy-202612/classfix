@@ -4,14 +4,14 @@ import sys
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QFileDialog, QLineEdit,
-                               QMessageBox, QPlainTextEdit, QSpinBox, QVBoxLayout)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QFileDialog, QInputDialog, QLineEdit,
+                               QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout)
 
 from .. import VERSION
 from .. import cloud
 from .. import delta
 from ..ai import AIConfig, AIError, FEEDBACK, analyze, evidence, validate_config
-from ..desktop_goose import DEEPSEEK_MODEL, DEEPSEEK_URL, original_goose_available
+from ..desktop_goose import DEEPSEEK_MODEL, DEEPSEEK_URL, original_goose_available, resolve_goose_folder
 from ..pptx import find_ffprobe
 from ..startup import set_startup, startup_enabled
 from ..update import (UpdateError, download, fetch_manifest, install_root, last_update_failure,
@@ -41,7 +41,7 @@ class SettingsPage(Page):
         self.on_account_changed = on_account_changed or (lambda: None)
         background, content = panel()
         content.addWidget(label("后台监视", "heading"))
-        content.addWidget(label("ClassFix 常驻系统托盘。课件检测在后台完成，只有发现问题时才显示右下角提示。", "muted"))
+        content.addWidget(label("EveTech 常驻系统托盘。课件检测在后台完成，只有发现问题时才显示右下角提示。", "muted"))
         self.monitor = QCheckBox("监视 PowerPoint 课件和放映中的视频")
         self.monitor.setChecked(settings.get("monitor_enabled", "1") != "0")
         self.media_etw = QCheckBox("播放出现异常时短时追踪（ETW，最长 8 秒）")
@@ -49,7 +49,7 @@ class SettingsPage(Page):
         self.media_etw.setToolTip("仅追踪确认的 PowerPoint 进程，证据保存在本机诊断记录。Windows 权限不足时会跳过。")
         self.memory_alerts = QCheckBox("系统内存持续偏高时提醒")
         self.memory_alerts.setChecked(settings.get("memory_alerts", "1") != "0")
-        self.startup = QCheckBox("登录 Windows 后自动启动 ClassFix")
+        self.startup = QCheckBox("登录 Windows 后自动启动 EveTech")
         self.startup.setChecked(startup_enabled())
         threshold_row = horizontal()
         threshold_row.addWidget(label("声音过低提示阈值", "strong"))
@@ -81,7 +81,7 @@ class SettingsPage(Page):
 
         online, content = panel()
         content.addWidget(label("AI 辅助分析（可选）", "heading"))
-        content.addWidget(label("每次调用前可预览并确认检测摘要。AI 密钥仅保留在本次运行内，也可由 CLASSFIX_AI_KEY 环境变量提供。", "muted"))
+        content.addWidget(label("每次调用前可预览并确认发送内容。截图问 AI 需要支持图片输入的模型，例如 deepseek-flash。AI 密钥仅保留在本次运行内，也可由 EVETECH_AI_KEY 环境变量提供。", "muted"))
         self.url = self.field(content, "Chat Completions 请求地址", settings.get("ai_url", ""),
                               "https://服务地址/v1/chat/completions")
         self.model = self.field(content, "模型名称", settings.get("ai_model", ""), "服务提供的模型标识")
@@ -91,29 +91,37 @@ class SettingsPage(Page):
         self.body.addWidget(online)
 
         self.goose_panel, content = panel()
-        content.addWidget(label("ClassFix 桌宠", "heading"))
-        self.goose_enabled = QCheckBox("按课表启用桌鹅")
+        content.addWidget(label("Desktop Pet", "heading"))
+        self.goose_enabled = QCheckBox("Enable Desktop Goose")
         self.goose_enabled.setChecked(settings.get("desktop_goose_enabled") == "1")
-        self.goose_weekends = QCheckBox("周末也按课表出场")
+        self.goose_weekends = QCheckBox("Use the school schedule on weekends")
         self.goose_weekends.setChecked(settings.get("desktop_goose_weekends") == "1")
-        self.touch_keyboard = QCheckBox("全局触摸键盘跟随可编辑输入区")
+        self.goose_debug = QCheckBox("Debug mode: ignore the school schedule")
+        self.goose_debug.setChecked(settings.get("desktop_goose_debug_always_show") == "1")
+        self.goose_debug.setToolTip("Lets the goose roam at any time. During PowerPoint slideshows it rests in its nest.")
+        self.touch_keyboard = QCheckBox("Show the touch keyboard when editing text")
         self.touch_keyboard.setChecked(settings.get("touch_keyboard_enabled") == "1")
         content.addWidget(self.goose_enabled)
         content.addWidget(self.goose_weekends)
+        content.addWidget(self.goose_debug)
         content.addWidget(self.touch_keyboard)
         row = horizontal()
         self.goose_folder = QLineEdit(settings.get("desktop_goose_folder", ""))
         self.goose_folder.setReadOnly(True)
-        self.goose_folder.setPlaceholderText("已解压的 Desktop Goose v0.31 目录")
+        self.goose_folder.setPlaceholderText("Extracted Desktop Goose v0.31 folder")
         row.addWidget(self.goose_folder, 1)
-        row.addWidget(button("选择原版…", self.choose_goose))
+        row.addWidget(button("Choose folder…", self.choose_goose))
         content.addLayout(row)
         actions = horizontal()
-        actions.addWidget(button("获取 Desktop Goose", self.download_goose, "link"))
-        actions.addWidget(button("使用 DeepSeek", self.use_deepseek, "link"))
+        actions.addWidget(button("Get Desktop Goose", self.download_goose, "link"))
+        actions.addWidget(button("Configure DeepSeek…", self.use_deepseek, "link"))
         actions.addStretch()
+        actions.addWidget(button("Save Settings", self.save_goose))
         content.addLayout(actions)
-        self.goose_status = label("保存设置后可从 ClassFix 托盘打开「问鹅」。", "muted")
+        self.goose_preview = QPushButton("Preview Goose")
+        self.goose_preview.setToolTip("Show the goose for 30 seconds outside school hours.")
+        content.addWidget(self.goose_preview, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.goose_status = label("DeepSeek is optional. You can open Ask Goose from the system tray.", "muted")
         content.addWidget(self.goose_status)
         self.body.addWidget(self.goose_panel)
 
@@ -398,12 +406,12 @@ class SettingsPage(Page):
         if plan["mode"] == "full":
             self.used_fallback = bool(force_full)
         if plan["mode"] == "patch":
-            name = "ClassFix-%s-to-%s.patch.zip" % (plan["entry"].get("from") or "old", manifest["version"])
+            name = "EveTech-%s-to-%s.patch.zip" % (plan["entry"].get("from") or "old", manifest["version"])
             self.progress.update(done=0, total=entry["size"])
             self.ticker.start()
             self.busy(True, "正在下载增量更新…")
         else:
-            name = "ClassFix-%s-Windows-x64.zip" % manifest["version"]
+            name = "EveTech-%s-Windows-x64.zip" % manifest["version"]
             self.progress.update(done=0, total=entry["size"])
             self.ticker.start()
             self.busy(True, "正在下载…")
@@ -472,7 +480,7 @@ class SettingsPage(Page):
     def ask_restart(self):
         if not self.pending:
             return
-        text = ("ClassFix 会先退出，然后自动替换文件并重新启动，大约十几秒。\n"
+        text = ("EveTech 会先退出，然后自动替换文件并重新启动，大约十几秒。\n"
                 "过程中不会再弹出任何命令行窗口，请不要手动干预。\n"
                 "当前版本 %s → %s\n\n"
                 "如果半分钟后没有自动打开，说明替换被系统拦下了："
@@ -492,8 +500,8 @@ class SettingsPage(Page):
                 QApplication.instance().quit()
 
     def update_from_file(self):
-        file, _ = QFileDialog.getOpenFileName(self, "选择 ClassFix 发布包", str(install_root()),
-                                              "ClassFix 发布包 (*.zip)")
+        file, _ = QFileDialog.getOpenFileName(self, "选择 EveTech 发布包", str(install_root()),
+                                              "EveTech 发布包 (*.zip)")
         if not file:
             return
         try:
@@ -541,34 +549,46 @@ class SettingsPage(Page):
             self.path.setText(file)
 
     def choose_goose(self):
-        folder = QFileDialog.getExistingDirectory(self, "选择已解压的 Desktop Goose v0.31 目录",
-                                                   self.goose_folder.text())
+        folder = QFileDialog.getExistingDirectory(self, "Choose the extracted Desktop Goose v0.31 folder",
+                                                   self.goose_folder.text(),
+                                                   QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontUseNativeDialog)
         if not folder:
             return
-        if not original_goose_available(folder):
-            self.goose_status.setText("请选择从官网下载并完整解压的 Windows v0.31 目录。")
+        folder = resolve_goose_folder(folder)
+        if not folder:
+            self.goose_status.setText("Choose the fully extracted, official Windows Desktop Goose v0.31 folder.")
             return
         self.goose_folder.setText(folder)
         self.goose_enabled.setChecked(True)
-        self.goose_status.setText("已识别原版桌鹅。点「保存设置」启用。")
+        self.goose_status.setText("Desktop Goose v0.31 was found. Click Save Settings to enable it.")
 
     def download_goose(self):
         QDesktopServices.openUrl(QUrl("https://samperson.itch.io/desktop-goose"))
 
     def use_deepseek(self):
+        key, accepted = QInputDialog.getText(self, "DeepSeek for Desktop Goose",
+                                             "DeepSeek API key (this session only)",
+                                             QLineEdit.EchoMode.Password, self.secret.text())
+        if not accepted:
+            return
         self.url.setText(DEEPSEEK_URL)
         self.model.setText(DEEPSEEK_MODEL)
-        self.secret.setFocus()
+        self.secret.setText(key)
+        self.goose_status.setText("Click Save Settings to apply your DeepSeek configuration.")
+
+    def save_goose(self):
+        self.save(from_desktop_pet=True)
 
     def config(self):
         return AIConfig(self.values.get("ai_url", ""), self.values.get("ai_model", ""),
-                        self.token or os.environ.get("CLASSFIX_AI_KEY", ""))
+                        self.token or os.environ.get("EVETECH_AI_KEY") or os.environ.get("CLASSFIX_AI_KEY", ""))
 
     def refresh_on_open(self):
         detected = find_ffprobe(self.values.get("ffprobe", ""))
         self.detected.setText(f"已找到 · {detected}" if detected else "尚未检测 · 当前找不到 FFprobe。")
 
-    def save(self):
+    def save(self, *, from_desktop_pet=False):
+        message = self.goose_status if from_desktop_pet else self.message
         values = {"ffprobe": self.path.text().strip(), "ai_url": self.url.text().strip(),
                   "ai_model": self.model.text().strip(), "theme": self.theme.currentData(),
                   "monitor_enabled": "1" if self.monitor.isChecked() else "0",
@@ -576,33 +596,45 @@ class SettingsPage(Page):
                   "memory_alerts": "1" if self.memory_alerts.isChecked() else "0",
                   "desktop_goose_enabled": "1" if self.goose_enabled.isChecked() else "0",
                   "desktop_goose_weekends": "1" if self.goose_weekends.isChecked() else "0",
+                  "desktop_goose_debug_always_show": "1" if self.goose_debug.isChecked() else "0",
                   "desktop_goose_folder": self.goose_folder.text(),
                   "touch_keyboard_enabled": "1" if self.touch_keyboard.isChecked() else "0",
                   "low_volume_threshold": str(self.threshold.value()),
                   "update_check": "1" if self.auto_check.isChecked() else "0"}
         if values["ffprobe"] and not find_ffprobe(values["ffprobe"]):
-            self.message.setText("找不到指定的 ffprobe.exe，请检查路径。")
+            message.setText("The selected ffprobe.exe could not be found. Check the path."
+                            if from_desktop_pet else "找不到指定的 ffprobe.exe，请检查路径。")
             return
         if self.goose_enabled.isChecked() and not original_goose_available(values["desktop_goose_folder"]):
-            self.message.setText("请先选择已解压的 Desktop Goose v0.31。")
+            text = "Choose the extracted Desktop Goose v0.31 folder first."
+            self.goose_status.setText(text)
+            message.setText(text)
             return
         try:
             if values["ai_url"] or values["ai_model"]:
                 validate_config(AIConfig(values["ai_url"], values["ai_model"]))
         except AIError as error:
-            self.message.setText(str(error))
+            message.setText("Check the AI request address and model name in Settings."
+                            if from_desktop_pet else str(error))
             return
         if not self.save_values(values):
-            self.message.setText("本地设置保存失败，请检查数据目录写入权限。")
+            message.setText("Could not save settings. Check write access to the data folder."
+                            if from_desktop_pet else "本地设置保存失败，请检查数据目录写入权限。")
             return
         self.values.update(values)
         self.token = self.secret.text().strip()
         apply_theme(self.app, values["theme"] == "dark")
         self.refresh_on_open()
+        self.goose_status.setText("Desktop pet settings saved.")
         if self.on_runtime_changed:
             self.on_runtime_changed(values)
-        self.message.setText("设置已保存。" if set_startup(self.startup.isChecked())
-                             else "设置已保存，但开机自启快捷方式更新失败。")
+        startup_saved = set_startup(self.startup.isChecked())
+        if from_desktop_pet:
+            if not startup_saved:
+                self.message.setText("Settings saved. The Windows startup shortcut could not be updated.")
+        else:
+            self.message.setText("设置已保存。" if startup_saved else "设置已保存，但开机自启快捷方式更新失败。")
+        return True
 
 
 class AnalysisDialog(QDialog):
@@ -610,7 +642,7 @@ class AnalysisDialog(QDialog):
 
     def __init__(self, parent, config, report, recovery, account=None, on_points=None):
         super().__init__(parent)
-        self.setWindowTitle("ClassFix · AI 辅助分析")
+        self.setWindowTitle("EveTech · AI 辅助分析")
         self.resize(660, 680)
         self.config = config
         self.report = report
@@ -626,7 +658,7 @@ class AnalysisDialog(QDialog):
         self.channel = QComboBox()
         if self.account.signed_in:
             cost = cloud.cost_of(self.account, self.kind)
-            self.channel.addItem("ClassFix 云端 · 本次 %d 积分（现有 %d 积分）"
+            self.channel.addItem("EveTech 云端 · 本次 %d 积分（现有 %d 积分）"
                                  % (cost, self.account.points), "cloud")
         if config.url and config.model:
             self.channel.addItem("自己的 API · %s（不扣积分）" % config.model, "key")
@@ -732,7 +764,7 @@ class AnalysisDialog(QDialog):
         self.message.setText("已扣除 %d 积分，剩余 %d 积分。请返回诊断页面复测并记录恢复结果。"
                              % (cost, self.account.points))
         self.output.setPlainText(cloud.advice_text(result))
-        self.channel.setItemText(0, "ClassFix 云端 · 本次 %d 积分（现有 %d 积分）"
+        self.channel.setItemText(0, "EveTech 云端 · 本次 %d 积分（现有 %d 积分）"
                                 % (cloud.cost_of(self.account, self.kind), self.account.points))
 
     def key_finished(self, response):

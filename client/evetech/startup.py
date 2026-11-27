@@ -9,7 +9,7 @@ from pathlib import Path
 
 def shortcut_path():
     startup = Path(os.environ["APPDATA"]) / "Microsoft/Windows/Start Menu/Programs/Startup"
-    return startup / "ClassFix.lnk"
+    return startup / "EveTech.lnk"
 
 
 def launch_command():
@@ -24,16 +24,19 @@ def launch_command():
 
 def startup_enabled():
     try:
-        return shortcut_path().is_file()
+        path = shortcut_path()
+        return path.is_file() or path.with_name("ClassFix.lnk").is_file()
     except (OSError, KeyError):
         return False
 
 
 def set_startup(enabled):
     path = shortcut_path()
+    legacy = path.with_name("ClassFix.lnk")
     if not enabled:
         try:
             path.unlink(missing_ok=True)
+            legacy.unlink(missing_ok=True)
             return True
         except OSError:
             return False
@@ -53,7 +56,7 @@ def set_startup(enabled):
             f"$link.Arguments = '{quoted(arguments)}'",
             f"$link.WorkingDirectory = '{quoted(target.parent)}'",
             f"$link.IconLocation = '{quoted(target)},0'",
-            "$link.Description = 'ClassFix 课堂故障监视'",
+            "$link.Description = 'EveTech 课堂故障监视'",
             "$link.Save()",
         ))
         encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
@@ -64,6 +67,9 @@ def set_startup(enabled):
             ["powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive",
              "-WindowStyle", "Hidden", "-EncodedCommand", encoded],
             check=False, capture_output=True, creationflags=0x08000000, timeout=45)
-        return completed.returncode == 0 and path.is_file()
+        if completed.returncode != 0 or not path.is_file():
+            return False
+        legacy.unlink(missing_ok=True)
+        return True
     except (OSError, KeyError, subprocess.SubprocessError):
         return False

@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 from zipfile import ZipFile
 
-from classfix import find
-from classfix.pptx import read_deck
+from evetech import find
+from evetech.pptx import read_deck
 
 P = "http://schemas.openxmlformats.org/presentationml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"

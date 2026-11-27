@@ -10,7 +10,7 @@ from pathlib import Path
 
 import psutil
 
-ELEVATED_CLEANUP_ARG = "--classfix-elevated-memory-cleanup"
+ELEVATED_CLEANUP_ARG = "--evetech-elevated-memory-cleanup"
 
 # Operation order follows the former PCL Community Edition MemSwapService.
 CLEANUP_STEPS = (

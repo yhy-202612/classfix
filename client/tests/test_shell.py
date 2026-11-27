@@ -7,10 +7,10 @@ from unittest.mock import patch
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication, QComboBox, QPushButton
 
-from classfix.app import create_window
-from classfix.storage import Store
-from classfix.ui.theme import apply_theme
-from classfix.ui.window import NAV
+from evetech.app import create_window
+from evetech.storage import Store
+from evetech.ui.theme import apply_theme
+from evetech.ui.window import NAV
 from test_pptx import make_deck
 
 
@@ -21,7 +21,7 @@ class ShellTest(unittest.TestCase):
         apply_theme(cls.app)
 
     def setUp(self):
-        self.enterContext(patch("classfix.app.cloud.load_cache", return_value={
+        self.enterContext(patch("evetech.app.cloud.load_cache", return_value={
             "fetched": time.time(), "payload": {},
         }))
 
@@ -119,8 +119,8 @@ class ShellTest(unittest.TestCase):
 
     def test_check_row_folds_extra_details_until_expanded(self):
         """「不存在」的音频输出收在 extra 里，只有点了「查看全部」才显示。"""
-        from classfix.model import Check
-        from classfix.ui.report import check_row
+        from evetech.model import Check
+        from evetech.ui.report import check_row
         from PySide6.QtWidgets import QLabel
 
         check = Check("audio_devices", "音频输出设备", "ok", "2 个可用，共 3 个已知输出。", "• 旧设备 · 不存在")

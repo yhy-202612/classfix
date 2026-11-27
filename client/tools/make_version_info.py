@@ -1,7 +1,7 @@
 """生成 PyInstaller 的 Windows 版本资源文件（build/version_info.txt）。
 
 用法：python tools/make_version_info.py build/version_info.txt
-版本号取自 classfix.VERSION，避免打包产物与代码里的版本号不一致。
+版本号取自 evetech.VERSION，避免打包产物与代码里的版本号不一致。
 """
 
 import sys
@@ -10,8 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from classfix import VERSION  # noqa: E402
-from classfix.update import version_tuple  # noqa: E402
+from evetech import VERSION  # noqa: E402
+from evetech.update import version_tuple  # noqa: E402
 
 TEMPLATE = """VSVersionInfo(
   ffi=FixedFileInfo(
@@ -29,13 +29,13 @@ TEMPLATE = """VSVersionInfo(
       StringTable(
         '080404b0',
         [
-          StringStruct('CompanyName', 'ClassFix'),
-          StringStruct('FileDescription', 'ClassFix 教室电脑放映急救箱'),
+          StringStruct('CompanyName', 'EveTech'),
+          StringStruct('FileDescription', 'EveTech 教室电脑放映急救箱'),
           StringStruct('FileVersion', '{version}'),
-          StringStruct('InternalName', 'ClassFix'),
-          StringStruct('LegalCopyright', 'ClassFix'),
-          StringStruct('OriginalFilename', 'ClassFix.exe'),
-          StringStruct('ProductName', 'ClassFix'),
+          StringStruct('InternalName', 'EveTech'),
+          StringStruct('LegalCopyright', 'EveTech'),
+          StringStruct('OriginalFilename', 'EveTech.exe'),
+          StringStruct('ProductName', 'EveTech'),
           StringStruct('ProductVersion', '{version}')
         ]
       )

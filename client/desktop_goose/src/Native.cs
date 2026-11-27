@@ -38,8 +38,14 @@ namespace ClassroomGoose
         internal static extern IntPtr GetDesktopWindow();
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         internal static extern IntPtr FindWindow(string className, string name);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string name);
         [DllImport("user32.dll")]
         internal static extern bool IsWindowVisible(IntPtr window);
+        [DllImport("user32.dll")]
+        internal static extern bool IsWindowEnabled(IntPtr window);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+        private static extern int GetWindowLong(IntPtr window, int index);
         [DllImport("user32.dll")]
         internal static extern bool IsIconic(IntPtr window);
         [DllImport("user32.dll")]
@@ -83,13 +89,17 @@ namespace ClassroomGoose
             var info = new GuiThreadInfo { Size = Marshal.SizeOf(typeof(GuiThreadInfo)) };
             int pid;
             uint thread = GetWindowThreadProcessId(foreground, out pid);
-            if (thread == 0 || !GetGUIThreadInfo(thread, ref info) || info.Focus == IntPtr.Zero)
+            if (thread == 0 || !GetGUIThreadInfo(thread, ref info) || info.Focus == IntPtr.Zero ||
+                info.Caret == IntPtr.Zero || !IsWindowEnabled(info.Focus))
                 return false;
 
             string type = ClassName(info.Focus);
-            return info.Caret != IntPtr.Zero &&
-                   (type.StartsWith("Edit", StringComparison.OrdinalIgnoreCase) ||
-                    type.StartsWith("RichEdit", StringComparison.OrdinalIgnoreCase));
+            const int windowStyle = -16;
+            const int readOnlyEdit = 0x0800;
+            return (type.Equals("Edit", StringComparison.OrdinalIgnoreCase) ||
+                    type.StartsWith("RichEdit", StringComparison.OrdinalIgnoreCase) ||
+                    type.StartsWith("WindowsForms10.EDIT.", StringComparison.OrdinalIgnoreCase)) &&
+                   (GetWindowLong(info.Focus, windowStyle) & readOnlyEdit) == 0;
         }
 
         internal static void RaiseWithoutFocus(IntPtr window)
@@ -97,11 +107,18 @@ namespace ClassroomGoose
             SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, NoMove | NoSize | NoActivatePosition);
         }
 
+        internal static IntPtr SlideshowWindow()
+        {
+            IntPtr slide = GetForegroundWindow();
+            if (ClassName(slide) == "screenClass" && Visible(slide)) return slide;
+            slide = IntPtr.Zero;
+            while ((slide = FindWindowEx(IntPtr.Zero, slide, "screenClass", null)) != IntPtr.Zero)
+                if (Visible(slide)) return slide;
+            return IntPtr.Zero;
+        }
+
         internal static bool IsFullScreen(int ownPid)
         {
-            IntPtr slide = FindWindow("screenClass", null);
-            if (Visible(slide)) return true;
-
             IntPtr window = GetForegroundWindow();
             if (!Visible(window)) return false;
             int pid;
@@ -109,6 +126,10 @@ namespace ClassroomGoose
             if (pid == ownPid) return false;
             string type = ClassName(window);
             if (type == "Progman" || type == "WorkerW" || type == "Shell_TrayWnd" || type == "Shell_SecondaryTrayWnd")
+                return false;
+            const int windowStyle = -16;
+            const int caption = 0x00C00000;
+            if ((GetWindowLong(window, windowStyle) & caption) == caption)
                 return false;
             Rect windowRect;
             if (!GetWindowRect(window, out windowRect)) return false;

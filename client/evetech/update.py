@@ -29,9 +29,9 @@ DOWNLOAD_TIMEOUT = 30
 CHUNK = 1 << 16
 MAX_PACKAGE_BYTES = 400 * 1024 * 1024
 MAX_MANIFEST_BYTES = 256 * 1024
-EXE_NAME = "ClassFix.exe"
-PACKAGE_META = "classfix-package.json"
-USER_AGENT = "ClassFix/%s (+classroom-tool)" % VERSION
+EXE_NAME = "EveTech.exe"
+PACKAGE_META = "evetech-package.json"
+USER_AGENT = "EveTech/%s (+classroom-tool)" % VERSION
 
 
 class UpdateError(Exception):
@@ -231,7 +231,7 @@ def unpack(zip_path, target):
 
 
 def package_root(directory):
-    """发布包可能是 ClassFix/ 单根目录，也可能直接是 exe 同级。"""
+    """发布包可能是 EveTech/ 单根目录，也可能直接是 exe 同级。"""
     directory = Path(directory)
     if (directory / EXE_NAME).is_file():
         return directory
@@ -270,7 +270,7 @@ def staging_directory(root=None):
 
 def log_path(root=None):
     root = Path(root or install_root())
-    return root.parent / "ClassFix-update.log"
+    return root.parent / "EveTech-update.log"
 
 
 def last_update_failure(root=None, within_hours=48):
@@ -293,7 +293,7 @@ def last_update_failure(root=None, within_hours=48):
         return None
     if "aborted" in last:
         return ("上次更新没有完成：旧版本进程一直没有退出，文件没有被替换。"
-                "请先彻底退出 ClassFix（托盘图标右键 → 退出），再重新安装。")
+                "请先彻底退出 EveTech（托盘图标右键 → 退出），再重新安装。")
     if "failed" in last or "cannot restart" in last or "missing" in last:
         return "上次更新没有完成，请手动解压完整包覆盖安装目录。"
     return None
@@ -385,7 +385,7 @@ def stage(zip_path, package_version, root=None, deletes=None):
     if inner is None:
         shutil.rmtree(staging, ignore_errors=True)
         raise UpdateError("发布包里没有找到 %s，无法完成更新。" % EXE_NAME)
-    script = script_directory(root) / ("ClassFix-update-%s.bat" % re.sub(r"[^0-9A-Za-z._-]", "_", str(package_version)))
+    script = script_directory(root) / ("EveTech-update-%s.bat" % re.sub(r"[^0-9A-Za-z._-]", "_", str(package_version)))
     updater_script(inner, root, script, deletes=deletes)
     return inner, script
 
@@ -420,7 +420,7 @@ def stage_patch(patch_zip, package_version, root=None, current_version=None):
         shutil.rmtree(staging, ignore_errors=True)
         raise UpdateError("本机安装目录不完整（缺 %s），差异更新会留下坏环境，请改用完整包。"
                           % "、".join(missing[:3]))
-    script = script_directory(root) / ("ClassFix-update-%s.bat" % re.sub(r"[^0-9A-Za-z._-]", "_", str(package_version)))
+    script = script_directory(root) / ("EveTech-update-%s.bat" % re.sub(r"[^0-9A-Za-z._-]", "_", str(package_version)))
     updater_script(inner, root, script, deletes=delta.delete_paths(patch))
     return inner, script
 
@@ -437,7 +437,7 @@ def launch_updater(script):
     这里必须用 CREATE_NO_WINDOW，不能用 DETACHED_PROCESS：DETACHED_PROCESS 完全不建
     控制台，cmd.exe 发现自己没有控制台就会自己 AllocConsole 出一个**可见**窗口——1.3
     升级到 1.4 时用户看到、并且一关就把更新打断的那个黑窗口（标题是
-    `find /I "ClassFix.exe"`，即 tasklist 管道那条命令）就是它。
+    `find /I "EveTech.exe"`，即 tasklist 管道那条命令）就是它。
     CREATE_NO_WINDOW 分配的是隐藏控制台，bat 里的 tasklist / robocopy 照常执行，
     只是全程不出现窗口；bat 末尾用 start 启动主程序，那是独立 GUI 进程，窗口正常显示。
     """
@@ -468,7 +468,7 @@ def stale_scripts(root=None):
     旧流程——所以主程序启动时要清掉。
     """
     try:
-        return sorted(script_directory(root).glob("ClassFix-update-*.bat"))
+        return sorted(script_directory(root).glob("EveTech-update-*.bat"))
     except OSError:
         return []
 
@@ -497,7 +497,7 @@ def local_packages(directory=None):
     found = []
     for folder in (directory, directory / "update"):
         if folder.is_dir():
-            found.extend(sorted(path for path in folder.glob("ClassFix-*.zip") if path.is_file()))
+            found.extend(sorted(path for path in folder.glob("EveTech-*.zip") if path.is_file()))
     return found
 
 
@@ -554,7 +554,7 @@ def update_cache_directory(root=None):
 
 
 def default_download_path(version, root=None):
-    return update_cache_directory(root) / ("ClassFix-%s-Windows-x64.zip" % version)
+    return update_cache_directory(root) / ("EveTech-%s-Windows-x64.zip" % version)
 
 
 def stamp():

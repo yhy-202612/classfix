@@ -24,7 +24,7 @@ namespace ClassroomGoose
 
         internal static Reply Blocked()
         {
-            return new Reply("这条提问或回答不适合在教室大屏显示。可以换个问题再试。", false);
+            return new Reply("This question or answer is unsuitable for the classroom screen. Try a different question.", false);
         }
     }
 
@@ -54,7 +54,7 @@ namespace ClassroomGoose
                 safety_check = new { level = "high" },
                 messages = new[]
                 {
-                    new { role = "system", content = "用适合中学生和课堂公开屏幕的中文回答。简洁，约300字以内。只输出可以直接阅读的纯文本。对不适合在教室展示的问题给出简短、有帮助的替代建议。" },
+                    new { role = "system", content = "Reply in English for a middle-school classroom screen. Use plain text and keep it within about 120 words. For topics unsuitable for the classroom, offer a short, helpful alternative." },
                     new { role = "user", content = question }
                 }
             };
@@ -74,21 +74,21 @@ namespace ClassroomGoose
                             body.IndexOf("Content Exists Risk", StringComparison.OrdinalIgnoreCase) >= 0)
                             return Reply.Blocked();
                         if (response.StatusCode == HttpStatusCode.Unauthorized)
-                            return new Reply("DeepSeek 没有接受这个 API 密钥。请在托盘里检查设置。", false);
+                            return new Reply("DeepSeek rejected the API key. Check Desktop Pet settings.", false);
                         if ((int)response.StatusCode == 429)
-                            return new Reply("DeepSeek 请求较多，请稍后再试。", false);
-                        return new Reply("DeepSeek 请求失败（HTTP " + (int)response.StatusCode + "）。", false);
+                            return new Reply("DeepSeek is receiving too many requests. Try again shortly.", false);
+                        return new Reply("DeepSeek request failed (HTTP " + (int)response.StatusCode + ").", false);
                     }
                 }
             }
             catch (OperationCanceledException)
             {
                 if (cancel.IsCancellationRequested) throw;
-                return new Reply("等待 DeepSeek 回答超时，请重试。", false);
+                return new Reply("DeepSeek took too long to reply. Please try again.", false);
             }
             catch (HttpRequestException)
             {
-                return new Reply("连接不到 DeepSeek，请检查网络。", false);
+                return new Reply("Could not reach DeepSeek. Check your network connection.", false);
             }
         }
 
@@ -111,7 +111,7 @@ namespace ClassroomGoose
             catch (ArgumentException) { }
             catch (InvalidOperationException) { }
 
-            return new Reply("DeepSeek 没有返回可展示的回答，请重试。", false);
+            return new Reply("DeepSeek did not return a displayable answer. Please try again.", false);
         }
 
         private static object Field(IDictionary<string, object> data, string name)

@@ -5,9 +5,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 
-from classfix.ai import AIConfig, AIError, analyze, evidence, validate_config
-from classfix.model import Check, Report
-from classfix.storage import Store
+from evetech.ai import AIConfig, AIError, analyze, evidence, validate_config
+from evetech.model import Check, Report
+from evetech.storage import Store
 
 
 class LocalHandler(BaseHTTPRequestHandler):
