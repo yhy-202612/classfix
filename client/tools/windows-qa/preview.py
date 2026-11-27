@@ -94,7 +94,7 @@ def main():
         window.set_focus()
         settings = wait_for(lambda: control(window, "\u8bbe\u7f6e"))
         if not settings:
-            window.print_control_identifiers()
+            print("Window controls:", [w.window_text() for w in window.descendants()], flush=True)
             raise RuntimeError("Settings navigation was missing from Windows UI Automation")
         settings.click_input()
         preview = None
@@ -106,7 +106,7 @@ def main():
             mouse.scroll(coords=(bounds.right - 95, max(bounds.top + 140, bounds.bottom - 195)), wheel_dist=-2)
             time.sleep(0.2)
         else:
-            window.print_control_identifiers()
+            print("Window controls:", [w.window_text() for w in window.descendants()], flush=True)
             raise RuntimeError("Could not scroll to the Preview Goose button")
         before = ImageGrab.grab(include_layered_windows=True).convert("RGB")
         before.save(report / "before-preview.png")
