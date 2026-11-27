@@ -108,6 +108,11 @@ def main():
         else:
             print("Window controls:", [w.window_text() for w in window.descendants()], flush=True)
             raise RuntimeError("Could not scroll to the Preview Goose button")
+        ready = wait_for(lambda: [text for text in desktop_pet_status(window)
+                                   if "outside the school schedule" in text.casefold()], 35)
+        if not ready:
+            raise RuntimeError(f"The helper did not reach idle before the test: {desktop_pet_status(window)!r}")
+        time.sleep(2)
         before = ImageGrab.grab(include_layered_windows=True).convert("RGB")
         before.save(report / "before-preview.png")
         print("Before clicking:", desktop_pet_status(window), flush=True)
