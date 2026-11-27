@@ -193,6 +193,11 @@ def download(url, target, digest, size=None, on_progress=None, timeout=DOWNLOAD_
     except (urllib.error.URLError, OSError) as error:
         partial.unlink(missing_ok=True)
         raise UpdateError("下载中断：%s" % (getattr(error, "reason", None) or error))
+    except Exception:
+        # 包体超限（UpdateError）、进度回调抛错、磁盘写失败等都不在上面的分支里；
+        # 不在这里清掉会留下半截 .part 文件。
+        partial.unlink(missing_ok=True)
+        raise
     if size and done != int(size):
         partial.unlink(missing_ok=True)
         raise UpdateError("下载大小与清单不一致（%d / %d 字节）。" % (done, int(size)))
