@@ -1,0 +1,5 @@
+PySide6-Essentials==6.8.3
+psutil==7.2.2
+pycaw==20251023
+pywin32==306; sys_platform == "win32" and python_version < "3.13"
+pywin32==308; sys_platform == "win32" and python_version == "3.13"

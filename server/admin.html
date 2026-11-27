@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>ClassFix 云端后台</title>
+<style>
+  :root { --ink:#16253a; --muted:#5b6b80; --line:#dde5ef; --bg:#f4f7fb; --card:#fff;
+          --accent:#1554b5; --solid:#185abf; --good:#126845; --warn:#8a5209; --bad:#ae3232; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.55 "Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif;
+         color:var(--ink); background:var(--bg); }
+  header { background:var(--solid); color:#fff; padding:14px 20px; display:flex;
+           align-items:center; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; font-weight:700; }
+  header .sp { flex:1; }
+  header button { background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.4);
+                  color:#fff; padding:6px 12px; border-radius:7px; cursor:pointer; }
+  main { max-width:1100px; margin:0 auto; padding:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:16px 18px; margin-bottom:16px; }
+  .card h2 { font-size:15px; margin:0 0 10px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  input, select, textarea { font:inherit; padding:8px 10px; border:1px solid var(--line);
+        border-radius:7px; background:#fff; color:inherit; }
+  textarea { width:100%; min-height:70px; resize:vertical; }
+  button.act { font:inherit; padding:7px 13px; border-radius:7px; border:1px solid var(--line);
+               background:#fff; cursor:pointer; }
+  button.act:hover { background:#eef4ff; border-color:#b7cdea; }
+  button.primary { background:var(--solid); border-color:var(--solid); color:#fff; }
+  button.primary:hover { background:#124a9f; }
+  button.danger { color:var(--bad); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
+  .stat { background:#f8fbff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .stat b { display:block; font-size:22px; font-weight:700; color:var(--accent); }
+  .stat span { font-size:12px; color:var(--muted); }
+  .item { border-top:1px solid var(--line); padding:12px 0; }
+  .item:first-of-type { border-top:0; }
+  .item h3 { margin:0 0 4px; font-size:14px; }
+  .tag { display:inline-block; font-size:12px; font-weight:700; padding:2px 7px;
+         border-radius:999px; background:#eef4ff; color:var(--accent); margin-left:6px; }
+  .tag.good { background:#e7f6ee; color:var(--good); }
+  .tag.warn { background:#fdf2e2; color:var(--warn); }
+  .tag.bad { background:#fdecec; color:var(--bad); }
+  .muted { color:var(--muted); font-size:13px; }
+  .mono { font-family:ui-monospace, Consolas, monospace; font-size:12px; }
+  #login { max-width:380px; margin:12vh auto; }
+  .hide { display:none !important; }
+  pre { background:#f7f9fc; border:1px solid var(--line); border-radius:8px; padding:10px;
+        white-space:pre-wrap; font-size:12px; margin:8px 0 0; }
+  .steps { margin:6px 0 0 18px; padding:0; }
+  .steps li { margin:2px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ClassFix 云端后台</h1>
+  <span class="sp"></span>
+  <span id="who" class="muted" style="color:#d8e6ff"></span>
+  <button id="btnRefresh" class="hide">刷新</button>
+  <button id="btnOut" class="hide">退出</button>
+</header>
+
+<main>
+  <section id="login" class="card">
+    <h2>管理口令</h2>
+    <div class="row">
+      <input id="pw" type="password" placeholder="输入管理口令" style="flex:1" />
+      <button class="act primary" id="btnLogin">进入</button>
+    </div>
+    <p class="muted" id="loginMsg"></p>
+  </section>
+
+  <div id="app" class="hide">
+    <section class="card">
+      <h2>概览</h2>
+      <div class="stats" id="stats"></div>
+      <p class="muted" id="autoNote" style="margin:12px 0 0"></p>
+    </section>
+
+    <section class="card">
+      <h2>设置</h2>
+      <div class="row" style="margin-bottom:10px">
+        <label class="row" style="gap:6px">
+          <input type="checkbox" id="autoPublish" />
+          <span>关闭人工复核：AI 归纳出的方案直接发布到客户端</span>
+        </label>
+      </div>
+      <p class="muted" style="margin:0 0 10px">
+        默认关闭（AI 总结 → 人工复查）。打开后新方案会自动发布，规则包版本立即递增，
+        客户端下次拉取就能看到；人工仍可随时下架。
+      </p>
+      <div class="row">
+        <label>新用户积分 <input id="newUserPoints" type="number" min="0" max="1000" style="width:88px" /></label>
+        <label>每日赠送 <input id="dailyGrant" type="number" min="0" max="100" style="width:80px" /></label>
+        <label>每人每日诊断上限 <input id="maxDiagnosesPerDay" type="number" min="1" max="500" style="width:88px" /></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label>视频诊断 <input id="costVideo" type="number" min="0" max="50" style="width:70px" /></label>
+        <label>声音诊断 <input id="costAudio" type="number" min="0" max="50" style="width:70px" /></label>
+        <label>课前巡检 <input id="costCheck" type="number" min="0" max="50" style="width:70px" /></label>
+        <button class="act primary" id="btnSaveSettings">保存设置</button>
+        <button class="act" id="btnPublish">发布规则包</button>
+      </div>
+      <p class="muted" id="settingsMsg"></p>
+    </section>
+
+    <section class="card">
+      <h2>问题库 <span class="muted" style="font-weight:400">（AI 诊断里提出、但离线流程未覆盖的问题）</span></h2>
+      <div class="row" style="margin-bottom:10px">
+        <select id="issueFilter">
+          <option value="">全部</option>
+          <option value="new">待处理</option>
+          <option value="reviewed">已生成方案</option>
+          <option value="adopted">已采纳</option>
+        </select>
+        <button class="act primary" id="btnGenAll">批量生成方案</button>
+        <span class="muted" id="issueMsg"></span>
+      </div>
+      <div id="issues"></div>
+    </section>
+
+    <section class="card">
+      <h2>方案库 <span class="muted" style="font-weight:400">（含已归档的离线基线）</span></h2>
+      <div class="row" style="margin-bottom:10px">
+        <button class="act" id="btnImportBaseline">把离线基线导入方案库</button>
+        <span class="muted" id="baselineMsg"></span>
+      </div>
+      <div id="solutions"></div>
+    </section>
+
+    <section class="card">
+      <h2>离线方案基线 <span class="muted" style="font-weight:400">（客户端已覆盖的方案，会注入诊断提示词，避免 AI 重复上报）</span></h2>
+      <div class="row" style="margin-bottom:10px">
+        <span class="muted" id="catalogMsg"></span>
+        <label style="margin-left:auto"><span class="muted">导入基线 JSON</span>
+          <input id="catalogFile" type="file" accept=".json,application/json" />
+        </label>
+      </div>
+      <div id="catalog"></div>
+    </section>
+
+    <section class="card">
+      <h2>最近诊断</h2>
+      <div id="recent"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const API = (location.pathname.replace(/\/[^/]*$/, '') || '').replace(/\/$/, '');
+const store = { token: localStorage.getItem('cf_admin_token') || '' };
+const el = (id) => document.getElementById(id);
+
+function esc(text) {
+  return String(text == null ? '' : text).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function api(path, options) {
+  const opt = options || {};
+  const response = await fetch(API + path, {
+    method: opt.method || (opt.body ? 'POST' : 'GET'),
+    headers: Object.assign({ 'Content-Type': 'application/json' },
+      store.token ? { Authorization: 'Bearer ' + store.token } : {}),
+    body: opt.body ? JSON.stringify(opt.body) : undefined
+  });
+  const text = await response.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch (e) { /* 忽略 */ }
+  if (!response.ok) throw new Error((json && json.error) || ('HTTP ' + response.status));
+  return json;
+}
+
+function tag(status) {
+  const map = { new: '待处理', reviewed: '已生成方案', adopted: '已采纳', draft: '草稿',
+                published: '已发布', rejected: '已驳回', baseline: '离线基线' };
+  const cls = { adopted: 'good', published: 'good', rejected: 'bad', draft: 'warn', new: 'warn' }[status] || '';
+  return '<span class="tag ' + cls + '">' + esc(map[status] || status) + '</span>';
+}
+
+async function load() {
+  const [overview, issues, solutions, catalog] = await Promise.all([
+    api('/api/admin/overview'), api('/api/admin/issues' + (el('issueFilter').value ? '?status=' + el('issueFilter').value : '')),
+    api('/api/admin/solutions'), api('/api/admin/catalog')
+  ]);
+  const s = overview.stats;
+  el('stats').innerHTML = [
+    ['用户', s.users], ['诊断总数', s.diagnoses], ['今日诊断', s.diagnosesToday],
+    ['问题数', s.issues], ['待处理问题', s.issuesNew], ['方案数', s.solutions],
+    ['已发布方案', s.solutionsPublished], ['规则包版本', s.rulesVersion],
+    ['离线基线', s.catalog || 0], ['已归档基线', s.solutionsBaseline || 0]
+  ].map(([label, value]) => '<div class="stat"><b>' + value + '</b><span>' + label + '</span></div>').join('');
+
+  const settings = overview.settings;
+  el('autoPublish').checked = !!settings.autoPublish;
+  el('newUserPoints').value = settings.newUserPoints;
+  el('dailyGrant').value = settings.dailyGrant;
+  el('maxDiagnosesPerDay').value = settings.maxDiagnosesPerDay;
+  el('costVideo').value = settings.cost.video;
+  el('costAudio').value = settings.cost.audio;
+  el('costCheck').value = settings.cost.check;
+  el('autoNote').textContent = settings.autoPublish
+    ? '当前：AI 归纳后自动发布，不需要人工复核。'
+    : '当前：AI 归纳后等人工复核（默认）。';
+
+  el('issues').innerHTML = issues.items.length ? issues.items.map((item) => (
+    '<div class="item">' +
+      '<h3>' + esc(item.title) + tag(item.status) +
+        '<span class="muted"> · ' + esc(item.kind) + ' · 出现 ' + item.count + ' 次' +
+        (item.checkKey ? ' · 检测项 ' + esc(item.checkKey) : '') + '</span></h3>' +
+      '<div class="muted">首次 ' + esc(item.firstSeen.slice(0, 16).replace('T', ' ')) +
+        ' · 最近 ' + esc(item.lastSeen.slice(0, 16).replace('T', ' ')) + '</div>' +
+      '<pre>' + item.samples.map((sample) =>
+        '依据：' + esc(sample.evidence || '—') + '\n处置：' + esc(sample.action || '—')).join('\n---\n') + '</pre>' +
+      '<div class="row" style="margin-top:8px">' +
+        '<button class="act primary" data-gen="' + esc(item.id) + '">AI 归纳成方案</button>' +
+      '</div>' +
+    '</div>'
+  )).join('') : '<p class="muted">还没有问题记录。客户端用积分做 AI 诊断后，AI 提到的新问题会自动汇总到这里。</p>';
+
+  el('solutions').innerHTML = solutions.items.length ? solutions.items.map((item) => (
+    '<div class="item" data-sol="' + esc(item.id) + '" data-kind="' + esc(item.kind || '') +
+      '" data-keys="' + esc((item.appliesTo || []).join(',')) + '" data-verify="' + esc(item.verify || '') + '">' +
+      '<h3>' + esc(item.title) + tag(item.status) +
+        '<span class="muted"> · ' + esc(item.kind || '通用') + ' · ' + esc(item.confidence || 'medium') +
+        ' · ' + esc((item.appliesTo || []).join(' / ') || '未指定检测项') + '</span></h3>' +
+      '<ol class="steps">' + (item.steps || []).map((step) => '<li>' + esc(step) + '</li>').join('') + '</ol>' +
+      (item.verify ? '<div class="muted">验证：' + esc(item.verify) + '</div>' : '') +
+      '<div class="row" style="margin-top:8px">' +
+        '<button class="act" data-edit="' + esc(item.id) + '">编辑</button>' +
+        (item.status === 'published'
+          ? '<button class="act danger" data-review="' + esc(item.id) + '" data-status="rejected">下架</button>'
+          : '<button class="act primary" data-review="' + esc(item.id) + '" data-status="published">采纳并发布</button>' +
+            '<button class="act danger" data-review="' + esc(item.id) + '" data-status="rejected">驳回</button>') +
+      '</div>' +
+    '</div>'
+  )).join('') : '<p class="muted">还没有方案。</p>';
+
+  el('recent').innerHTML = overview.recent.length ? overview.recent.map((item) => (
+    '<div class="item"><div class="muted">' + esc(item.at.slice(0, 16).replace('T', ' ')) + ' · ' + esc(item.kind) + '</div>' +
+    '<div>' + esc(item.advice) + '…</div></div>'
+  )).join('') : '<p class="muted">暂无。</p>';
+
+  const cat = catalog.items || [];
+  el('catalogMsg').textContent = cat.length
+    ? '已导入 ' + cat.length + ' 条（命中后会告诉模型这些不用再提）。'
+    : '还没有导入基线，用下方按钮选 catalog.json。';
+  el('catalog').innerHTML = cat.length ? cat.map((item) => (
+    '<div class="item"><h3>' + esc(item.title) +
+      '<span class="muted"> · ' + esc(item.origin || 'offline') + (item.key ? ' · ' + esc(item.key) : '') + '</span></h3>' +
+      (item.action ? '<div class="muted">' + esc(item.action) + '</div>' : '') + '</div>'
+  )).join('') : '<p class="muted">未导入。导入后诊断提示词会自动带上「这些已覆盖，不必重复」。</p>';
+}
+
+async function enter() {
+  el('login').classList.add('hide');
+  el('app').classList.remove('hide');
+  el('btnOut').classList.remove('hide');
+  el('btnRefresh').classList.remove('hide');
+  el('who').textContent = '已登录';
+  await load();
+}
+
+el('btnLogin').onclick = async () => {
+  el('loginMsg').textContent = '正在校验…';
+  try {
+    const result = await api('/api/admin/login', { body: { password: el('pw').value } });
+    store.token = result.token;
+    localStorage.setItem('cf_admin_token', store.token);
+    el('loginMsg').textContent = '';
+    await enter();
+  } catch (error) {
+    el('loginMsg').textContent = error.message;
+  }
+};
+
+el('btnOut').onclick = () => {
+  store.token = '';
+  localStorage.removeItem('cf_admin_token');
+  location.reload();
+};
+
+el('btnRefresh').onclick = () => load().catch((error) => alert(error.message));
+
+el('btnSaveSettings').onclick = async () => {
+  el('settingsMsg').textContent = '正在保存…';
+  try {
+    await api('/api/admin/settings', { body: {
+      autoPublish: el('autoPublish').checked,
+      newUserPoints: Number(el('newUserPoints').value),
+      dailyGrant: Number(el('dailyGrant').value),
+      maxDiagnosesPerDay: Number(el('maxDiagnosesPerDay').value),
+      cost: {
+        video: Number(el('costVideo').value),
+        audio: Number(el('costAudio').value),
+        check: Number(el('costCheck').value),
+        preflight: Number(el('costCheck').value)
+      }
+    } });
+    el('settingsMsg').textContent = '已保存。';
+    await load();
+  } catch (error) {
+    el('settingsMsg').textContent = error.message;
+  }
+};
+
+el('btnPublish').onclick = async () => {
+  try {
+    const result = await api('/api/admin/publish', { body: {} });
+    el('settingsMsg').textContent = '规则包已发布，版本 ' + result.rules.version + '，共 ' + result.rules.items.length + ' 条。';
+    await load();
+  } catch (error) {
+    el('settingsMsg').textContent = error.message;
+  }
+};
+
+el('issueFilter').onchange = () => load().catch((error) => alert(error.message));
+
+el('btnImportBaseline').onclick = async () => {
+  el('baselineMsg').textContent = '正在归档…';
+  try {
+    const result = await api('/api/admin/solutions/import-baseline', { body: {} });
+    el('baselineMsg').textContent = result.created.length
+      ? '已归档 ' + result.created.length + ' 条离线方案（状态=离线基线，不进规则包）。'
+      : '没有新增（都已归档过）。';
+    await load();
+  } catch (error) {
+    el('baselineMsg').textContent = error.message;
+  }
+};
+
+el('catalogFile').onchange = async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  el('catalogMsg').textContent = '正在导入 ' + file.name + ' …';
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const items = Array.isArray(data) ? data : (data.items || []);
+    if (!items.length) throw new Error('文件里没有 items 数组。');
+    const result = await api('/api/admin/catalog', { body: { items } });
+    el('catalogMsg').textContent = '已导入 ' + result.count + ' 条基线。';
+    await load();
+  } catch (error) {
+    el('catalogMsg').textContent = '导入失败：' + error.message;
+  } finally {
+    event.target.value = '';
+  }
+};
+
+el('btnGenAll').onclick = async () => {
+  el('issueMsg').textContent = '正在归纳（最多 10 条）…';
+  try {
+    const result = await api('/api/admin/solution/generate-all', { body: {} });
+    el('issueMsg').textContent = '已生成 ' + result.created.length + ' 条方案' +
+      (result.failed.length ? '，失败 ' + result.failed.length + ' 条' : '') + '。';
+    await load();
+  } catch (error) {
+    el('issueMsg').textContent = error.message;
+  }
+};
+
+document.addEventListener('click', async (event) => {
+  const target = event.target.closest('button');
+  if (!target) return;
+  try {
+    if (target.dataset.gen) {
+      target.disabled = true;
+      target.textContent = '归纳中…';
+      await api('/api/admin/solution/generate', { body: { issueId: target.dataset.gen } });
+      await load();
+    } else if (target.dataset.review) {
+      await api('/api/admin/solution/review', { body: {
+        id: target.dataset.review, status: target.dataset.status
+      } });
+      await load();
+    } else if (target.dataset.edit) {
+      const card = document.querySelector('[data-sol="' + target.dataset.edit + '"]');
+      const steps = card.querySelector('.steps');
+      const stepsText = Array.from(steps.children).map((li) => li.textContent).join('\n');
+      const title = prompt('方案名称', card.querySelector('h3').childNodes[0].textContent.trim());
+      if (title === null) return;
+      const keys = prompt('生效检测项 key（逗号分隔，留空=所有检测都提示）\n常用：audio_devices / powerpoint_volume / display / videofile',
+        card.dataset.keys || '');
+      if (keys === null) return;
+      const edited = prompt('步骤（每行一条）', stepsText);
+      if (edited === null) return;
+      const verify = prompt('验证方法', card.dataset.verify || '');
+      if (verify === null) return;
+      await api('/api/admin/solution/save', { body: {
+        id: target.dataset.edit, title, verify,
+        appliesTo: keys.split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean),
+        steps: edited.split('\n').map((line) => line.trim()).filter(Boolean)
+      } });
+      await load();
+    }
+  } catch (error) {
+    alert(error.message);
+    await load().catch(() => {});
+  }
+});
+
+if (store.token) enter().catch(() => { store.token = ''; localStorage.removeItem('cf_admin_token'); });
+</script>
+</body>
+</html>

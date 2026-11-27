@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ClassFix · 教室电脑 PPT 放映急救箱</title>
+<meta name="description" content="ClassFix 是一个免安装的 Windows 桌面小工具：课前巡检、PPT 视频诊断、放映时低音量提醒，帮老师在打铃前把问题解决掉。">
+<link rel="canonical" href="https://aiclass.openplays.cn/classfix/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ClassFix">
+<meta property="og:title" content="ClassFix · 教室电脑 PPT 放映急救箱">
+<meta property="og:description" content="课前巡检、PPT 视频诊断、放映时低音量提醒。免安装、免管理员权限，数据留在本机。">
+<meta property="og:url" content="https://aiclass.openplays.cn/classfix/">
+<meta property="og:image" content="https://aiclass.openplays.cn/classfix/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ClassFix：教室电脑的 PPT 放映急救箱">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b1220">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Cpath d='M20 26h24M20 34h16M20 42h20' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script>document.documentElement.classList.add('js')</script>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  :root{
+    --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b;
+    --line:#e2e8f0; --bg:#f7f9fc; --card:#fff;
+    --brand:#2563eb; --brand-2:#3b82f6; --brand-soft:#eff4ff;
+    --radius:16px; --shadow:0 1px 2px rgba(15,23,42,.06),0 10px 30px -16px rgba(15,23,42,.22);
+    --ease:cubic-bezier(.22,.8,.25,1);
+    --vh:100vh;
+  }
+  html{-webkit-text-size-adjust:100%; scroll-behavior:auto; overflow-anchor:none}
+  html,body{margin:0;padding:0;overscroll-behavior-y:none}
+  body{
+    background:var(--bg); color:var(--ink); overflow-x:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  a{color:inherit}
+  button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;
+    background:rgba(37,99,235,.08);padding:1px 5px;border-radius:5px;
+    white-space:nowrap;overflow-wrap:normal}
+  :focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:8px}
+  body{-webkit-tap-highlight-color:transparent}
+
+  /* =================== 分屏舞台 =================== */
+  .deck{position:relative}
+
+  /* =================== 触控设备：单滚动轴 + 滚动停止软吸附 ===================
+     手机端不再由 JS 拖拽切层（touchstart 是 passive、超阈值后才 preventDefault，
+     原生滚动已起步，两套位移叠加 + scroll 回改 idx 就是「瞬移 / 吸附错乱」的根源）。
+     触控模式下层高自然撑开、页面只剩一条滚动轴、惯性交给浏览器，
+     JS 只在滚动真正停止后判断「是否滑过一层的一半」再对齐到层顶。 */
+  body.touch-mode{touch-action:none}      /* 拖动由脚本接管 */
+body.touch-mode .slide{
+    height:auto; min-height:var(--vh,100vh);
+  }
+  @supports(height:100dvh){
+    body.touch-mode .slide{min-height:100dvh}
+  }
+  body.touch-mode .slide .inner{
+    flex:1 0 auto; overflow:visible; overscroll-behavior:auto; -webkit-overflow-scrolling:auto;
+    background-image:none;
+  }
+  .slide{
+    position:relative; height:100vh; height:var(--vh); min-height:520px;
+    display:flex; flex-direction:column; overflow:hidden; isolation:isolate;
+  }
+  .inner{
+    position:relative; z-index:2; width:100%; max-width:1060px; margin:0 auto;
+    padding:0 22px 76px; display:flex; flex-direction:column;
+    justify-content:center; justify-content:safe center;
+    gap:clamp(10px,1.6vh,20px); flex:1 1 auto; min-height:0;
+    overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+    overscroll-behavior:contain;
+  }
+  .inner::-webkit-scrollbar{display:none}
+  /* 内容超出一屏时才出现的细小滚动提示 */
+  .inner{background-image:linear-gradient(to bottom,rgba(15,23,42,.05),transparent 18px);
+    background-size:100% 100%; background-repeat:no-repeat; background-attachment:local}
+
+  /* 入场动效
+     初始态只在 html.js 下生效：脚本被禁用或加载失败时，内容照常可见而不是三屏空白。 */
+  html.js .rv{opacity:0; transform:translateY(18px) scale(.985);
+    transition:opacity .62s var(--ease), transform .68s var(--ease);
+    transition-delay:var(--d,0s)}
+  html.js .slide.on .rv{opacity:1; transform:none}
+  html.js .pop{opacity:0; transform:translateY(22px) scale(.94);
+    transition:opacity .5s var(--ease), transform .58s cubic-bezier(.18,1.25,.4,1);
+    transition-delay:var(--d,0s)}
+  html.js .slide.on .pop{opacity:1; transform:none}
+
+  /* =================== 第 1 层 · 主展示 =================== */
+  .s1{color:#eef2ff;
+    background:radial-gradient(1200px 620px at 76% -14%,#1e40af 0%,#0b1220 60%),#0b1220}
+  .s1::before{content:"";position:absolute;inset:auto -12% -55% -12%;height:60%;
+    background:radial-gradient(closest-side,rgba(37,99,235,.30),transparent);pointer-events:none;z-index:1}
+  .s1::after{content:"";position:absolute;top:-15%;right:-10%;width:46vw;height:46vw;max-width:620px;max-height:620px;
+    border-radius:50%;background:radial-gradient(closest-side,rgba(96,165,250,.20),transparent);pointer-events:none;z-index:1}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.2px}
+  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(145deg,#3b82f6,#1d4ed8);
+    display:grid;place-items:center;box-shadow:0 8px 22px -10px #3b82f6}
+  .logo svg{width:19px;height:19px}
+  .ver{font-size:12px;font-weight:600;color:#93c5fd;background:rgba(59,130,246,.16);
+    border:1px solid rgba(147,197,253,.32);padding:2px 9px;border-radius:999px}
+  .hero-grid{display:grid;grid-template-columns:1.06fr .94fr;gap:clamp(20px,3vw,38px);align-items:center}
+  h1{font-size:clamp(25px,4.3vw,36px);line-height:1.26;margin:0 0 clamp(9px,1.4vh,15px);
+    letter-spacing:-.4px;font-weight:800}
+  h1 em{font-style:normal;background:linear-gradient(100deg,#60a5fa,#bfdbfe 60%,#60a5fa);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .lead{margin:0;color:#c3d0e6;font-size:clamp(13.5px,1.55vh,15.5px);max-width:46ch}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:clamp(12px,1.8vh,20px)}
+  .chip{font-size:clamp(11.5px,1.35vh,12.5px);color:#dbeafe;background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .dl{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.15);
+    border-radius:20px;padding:clamp(16px,2.4vh,22px);backdrop-filter:blur(10px);
+    box-shadow:0 28px 64px -34px rgba(0,0,0,.85)}
+  .dl h2{margin:0 0 3px;font-size:15px;color:#fff;font-weight:700}
+  .dl .sub{margin:0 0 clamp(11px,1.6vh,16px);font-size:clamp(11.5px,1.3vh,12.5px);color:#9fb3d1}
+  .btn{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+    text-decoration:none;border-radius:12px;padding:clamp(10px,1.5vh,13px) 16px;
+    margin-bottom:9px;transition:transform .16s var(--ease),box-shadow .2s,background .2s}
+  .btn:active{transform:translateY(1px) scale(.995)}
+  .btn-main{background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;box-shadow:0 14px 30px -16px #3b82f6}
+  .btn-main:hover{background:linear-gradient(180deg,#4c8ff8,#2f6ceb);box-shadow:0 18px 38px -16px #3b82f6}
+  .btn-ghost{background:rgba(255,255,255,.06);color:#e2e8f5;border:1px solid rgba(255,255,255,.16)}
+  .btn-ghost:hover{background:rgba(255,255,255,.11)}
+  .btn b{font-size:clamp(13.5px,1.6vh,15px);font-weight:700;display:block;line-height:1.35}
+  .btn small{font-size:clamp(10.5px,1.2vh,11.5px);opacity:.85;display:block;margin-top:1px}
+  .btn .ico{flex:0 0 auto;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+    background:rgba(255,255,255,.16);transition:transform .2s var(--ease)}
+  .btn:hover .ico{transform:translateY(2px)}
+  .btn .ico svg{width:17px;height:17px}
+  .dl .note{font-size:clamp(10.5px,1.2vh,11.5px);color:#94a8c6;margin:10px 0 0;line-height:1.55}
+  .dl .note a{color:#bfdbfe;text-decoration:underline dashed;text-decoration-color:rgba(191,219,254,.45);
+    text-underline-offset:3px;text-decoration-thickness:1px}
+  .hero-foot{display:flex;align-items:center;gap:14px;margin-top:clamp(10px,1.6vh,16px)}
+  .more{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#b7c7e2;
+    text-decoration:underline dashed;text-decoration-color:rgba(183,199,226,.35);
+    text-underline-offset:3px;text-decoration-thickness:1px}
+  .more:hover{color:#fff}
+  .more svg{width:13px;height:13px}
+
+  /* =================== 第 2/3/4 层通用 =================== */
+  .s2,.s3,.s4{background:var(--bg)}
+  .s2::before,.s3::before,.s4::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(760px 420px at 88% -6%,rgba(37,99,235,.07),transparent 70%)}
+  .s3{background:linear-gradient(180deg,#f7f9fc,#eef4ff 55%,#f7f9fc)}
+  .head h2{margin:0;font-size:clamp(19px,2.7vw,25px);letter-spacing:-.2px;font-weight:800}
+  .head .line{display:block;width:38px;height:3px;border-radius:2px;margin-top:9px;
+    background:linear-gradient(90deg,var(--brand),#93c5fd)}
+
+  /* 功能卡 */
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:1fr;gap:clamp(9px,1.4vh,14px)}
+  .card{position:relative;text-align:left;width:100%;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:clamp(12px,1.9vh,18px);box-shadow:var(--shadow);
+    transition:transform .22s var(--ease),box-shadow .24s,border-color .2s;cursor:pointer;overflow:hidden}
+  .card::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    box-shadow:inset 0 0 0 1px rgba(37,99,235,0);transition:box-shadow .24s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 18px 40px -22px rgba(15,23,42,.34);border-color:#c9daf8}
+  .card:hover::after{box-shadow:inset 0 0 0 1px rgba(37,99,235,.16)}
+  .card:active{transform:translateY(-1px) scale(.994)}
+  .card .top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+  .card .ic{width:32px;height:32px;border-radius:9px;background:var(--brand-soft);
+    display:grid;place-items:center;color:var(--brand);flex:0 0 auto}
+  .card .ic svg{width:17px;height:17px}
+  .card h3{margin:0;font-size:clamp(14px,1.75vh,15.5px);font-weight:700}
+  .card p{margin:0;color:var(--ink-2);font-size:clamp(12px,1.5vh,13.5px);line-height:1.55}
+  .card .hint{position:absolute;right:11px;bottom:9px;font-size:11px;color:#64748b;
+    opacity:0;transform:translateX(4px);transition:.22s}
+  .card:hover .hint{opacity:1;transform:none}
+
+  /* 为什么值得装 */
+  .why{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(9px,1.4vh,14px)}
+  .why .item{background:linear-gradient(180deg,#fff,#fafcff);border:1px solid var(--line);
+    border-radius:var(--radius);padding:clamp(13px,2vh,18px);box-shadow:var(--shadow);text-align:left;
+    cursor:pointer;transition:transform .22s var(--ease),box-shadow .24s,border-color .2s}
+  .why .item:hover{transform:translateY(-3px);border-color:#c9daf8;
+    box-shadow:0 18px 40px -22px rgba(15,23,42,.3)}
+  .why .item b{display:block;font-size:clamp(13.5px,1.7vh,15px);margin-bottom:4px}
+  .why .item span{font-size:clamp(11.5px,1.45vh,13px);color:var(--ink-3);line-height:1.55}
+  .why .item .k{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+    color:var(--brand);background:var(--brand-soft);border-radius:999px;padding:2px 9px;margin-bottom:8px}
+
+  /* 更新报告 */
+  .log{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(7px,1.1vh,11px)}
+  .log .row:last-child{grid-column:1 / -1}
+  .s4 .prev{font-size:13px;line-height:1.7;opacity:.66;margin-top:12px}
+  .log .row{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);
+    border-radius:12px;padding:clamp(9px,1.4vh,13px) clamp(11px,1.5vw,15px);box-shadow:var(--shadow)}
+  .tag{flex:0 0 auto;font-size:11.5px;font-weight:700;height:22px;padding:0 9px;border-radius:6px;
+    display:inline-flex;align-items:center;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;
+    white-space:nowrap;margin-top:1px}
+  .tag.g{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
+  .log .row div{font-size:clamp(11.5px,1.45vh,13px);color:var(--ink-2);line-height:1.55}
+  .log .row b{color:var(--ink);font-weight:600}
+  .s4 .foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;
+    font-size:11.5px;color:var(--ink-3);margin-top:clamp(6px,1vh,10px)}
+  .s4 .foot a,.s4 .foot .link-btn{color:inherit;text-decoration:underline dashed;
+    text-decoration-color:#cbd5e1;text-underline-offset:3px;text-decoration-thickness:1px}
+  .s4 .foot a:hover,.s4 .foot .link-btn:hover{text-decoration-color:var(--brand);color:var(--ink-2)}
+
+  /* =================== 导航 =================== */
+  .nav-top{position:absolute;left:0;right:0;top:max(26px,env(safe-area-inset-top));z-index:5;
+    display:none;justify-content:center;pointer-events:none}
+  .nav-top .arrow{pointer-events:auto}
+  .nav-bottom{position:absolute;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));z-index:5;
+    display:flex;justify-content:center;align-items:center;gap:10px;pointer-events:none}
+  .arrow{pointer-events:auto;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+    opacity:.5;transition:opacity .22s,transform .22s,background .22s;color:#0f172a;
+    background:rgba(15,23,42,.05);border:1px solid rgba(15,23,42,.1)}
+  .arrow:hover{opacity:.9;transform:translateY(1px);background:rgba(15,23,42,.09)}
+  .arrow svg{width:17px;height:17px}
+  .s1 .arrow{color:#e6edfb;background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.2)}
+  .s1 .arrow:hover{background:rgba(255,255,255,.17)}
+  .arrow[hidden]{display:none}
+  /* 层内还在滚动阅读时，箭头变淡；到边界才恢复（仍可点击）。
+     .35 是「仍能看见这是控件」的下限，再淡就摸不到（触屏没有 hover 可恢复）。 */
+  .arrow.idle{opacity:.35;animation:none}
+  .arrow.idle:hover{opacity:.75}
+  /* 用户一旦开始操作，箭头停止呼吸动画，避免与切层动画抢注意力 */
+  body.no-bob .arrow{animation:none!important}
+  .arrow.down{animation:bob 2.4s ease-in-out 1.1s infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
+  .arrow.up{animation:bobUp 2.4s ease-in-out 1.1s infinite}
+  @keyframes bobUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+
+  /* 圆点导航：视觉仍是 8px 小点，命中区用伪元素撑到 24×24（触屏 36×36），
+     否则手指点在 8px 上几乎必失手。 */
+  .dots{position:fixed;right:8px;top:50%;transform:translateY(-50%);z-index:6;display:flex;
+    flex-direction:column;gap:2px}
+  .dots button{width:24px;height:24px;display:grid;place-items:center;border-radius:99px}
+  .dots button::before{content:"";display:block;width:8px;height:8px;border-radius:99px;
+    background:rgba(15,23,42,.18);transition:.28s var(--ease)}
+  .dots button.on::before{height:22px;background:var(--brand)}
+  .dots.on-dark button::before{background:rgba(255,255,255,.3)}
+  .dots.on-dark button.on::before{background:#93c5fd}
+  @media (pointer:coarse){.dots button{width:36px;height:36px}}
+
+  /* =================== 弹窗 ===================
+     原生 <dialog> + showModal()：焦点陷阱、背景 inert、Esc、手机返回手势、
+     焦点归还都由浏览器负责，CSS 与 JS 都更少。不再手写 role=dialog / aria-modal /
+    body 锁滚动（锁滚动会打断页面既有滚动，且与原生 top layer 冲突）。 */
+  .modal{width:100%;max-width:none;height:100%;max-height:none;margin:0;padding:18px;border:0;
+    background:transparent;color:inherit;overscroll-behavior:contain;
+    display:none;align-items:center;justify-content:center}
+  .modal[open]{display:flex}
+  .modal::backdrop{background:rgba(8,13,24,.62);backdrop-filter:blur(5px);
+    overflow:hidden;overscroll-behavior:contain}
+  .panel{width:min(560px,100%);max-height:84vh;max-height:84dvh;overflow-y:auto;
+    background:#fff;border-radius:18px;padding:22px;position:relative;
+    box-shadow:0 40px 90px -30px rgba(8,13,24,.6);
+    transform:none;opacity:1;
+    transition:transform .34s cubic-bezier(.18,1.2,.4,1),opacity .26s}
+  @starting-style{.modal[open] .panel{transform:translateY(14px) scale(.95);opacity:0}}
+  .panel h3{margin:0 0 4px;font-size:18px;letter-spacing:-.1px}
+  .panel .m-sub{margin:0 0 12px;font-size:13px;color:var(--ink-3)}
+  .panel .x{position:absolute;right:12px;top:12px;width:34px;height:34px;border-radius:10px;
+    display:grid;place-items:center;color:var(--ink-3);background:#f1f5f9}
+  .panel .x:hover{background:#e6ecf5;color:var(--ink)}
+  .panel ul{margin:0;padding-left:17px;font-size:13.5px;color:var(--ink-2)}
+  /* 弹层里的长路径（%LOCALAPPDATA%\ClassFix\…）必须能折行，否则窄屏被裁掉看不见结尾 */
+  .panel code{white-space:normal;overflow-wrap:anywhere}
+  .panel li{margin:6px 0}
+  .panel li b{color:var(--ink)}
+  .panel .files{display:grid;gap:7px;margin-top:4px}
+  .panel .file{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    text-decoration:none;padding:9px 11px;border:1px solid var(--line);border-radius:10px;
+    font-size:13px;color:var(--ink-2);background:#fcfdff;transition:.15s}
+  .panel .file:hover{border-color:#c7d7f5;background:#f7faff;color:var(--ink)}
+  .panel .file em{font-style:normal;font-size:11px;color:var(--ink-3);white-space:nowrap}
+
+  /* =================== 响应式 =================== */
+  /* 桌面：上箭头移到顶部，内容与字号整体放大 */
+  @media (min-width:861px){
+    .inner{max-width:1260px;padding:70px 34px 90px;gap:clamp(16px,2.2vh,30px)}
+    .s1 .inner{padding-top:34px}
+    .nav-top{display:flex}
+    .nav-bottom .arrow.up{display:none}
+    .hero-grid{grid-template-columns:1fr 1.02fr;gap:clamp(26px,3.4vw,52px)}
+    h1{font-size:clamp(34px,3.7vw,47px)}
+    .lead{font-size:17px;max-width:46ch;line-height:1.68}
+    .chip{font-size:13.5px;padding:7px 14px}
+    .brand{font-size:18px;gap:13px}
+    .logo{width:40px;height:40px;border-radius:11px}
+    .logo svg{width:22px;height:22px}
+    .ver{font-size:13px;padding:3px 11px}
+    .dl{padding:30px 30px 26px;border-radius:22px}
+    .dl h2{font-size:18px}
+    .dl .sub{font-size:13.5px}
+    .btn{padding:17px 20px;border-radius:14px;margin-bottom:11px}
+    .btn b{font-size:17px}
+    .btn small{font-size:13px}
+    .btn .ico{width:38px;height:38px;border-radius:11px}
+    .btn .ico svg{width:20px;height:20px}
+    .dl .note{font-size:12.5px;line-height:1.65}
+    .more{font-size:14px}
+    .head h2{font-size:clamp(26px,2.5vw,33px)}
+    .head .line{width:50px;height:4px;margin-top:12px}
+    .card{padding:26px 28px;border-radius:18px;display:flex;flex-direction:column}
+    .card .top{gap:12px;margin-bottom:9px}
+    .card .ic{width:44px;height:44px;border-radius:12px}
+    .card .ic svg{width:23px;height:23px}
+    .card h3{font-size:18.5px}
+    .card p{font-size:15px;line-height:1.65;flex:1 1 auto}
+    .card .hint{position:static;opacity:.75;transform:none;margin-top:14px;padding-top:11px;
+      border-top:1px solid var(--line);font-size:11.5px}
+    .why{grid-auto-rows:1fr}
+    .why .item{padding:26px 28px;border-radius:18px;min-height:214px;display:flex;flex-direction:column}
+    .why .item span{flex:1 1 auto}
+    .why .item::after{content:"点击查看细节";font-size:11.5px;color:#94a3b8;margin-top:14px;
+      padding-top:11px;border-top:1px solid var(--line)}
+    .why .item b{font-size:18px}
+    .why .item span{font-size:15px;line-height:1.65}
+    .why .item .k{font-size:12.5px;padding:3px 12px;margin-bottom:11px}
+    .log .row{padding:17px 20px;border-radius:13px;gap:13px}
+    .log .row div{font-size:15px;line-height:1.6}
+    .tag{font-size:12px;height:23px;padding:0 10px}
+    .s4 .foot{font-size:13px;margin-top:14px}
+    .arrow{width:48px;height:48px}
+    .arrow svg{width:20px;height:20px}
+    .dots{gap:2px;right:8px}
+    .dots button{width:24px;height:24px}
+    .dots button::before{width:9px;height:9px}
+    .dots button.on::before{height:28px}
+  }
+  @media (max-width:860px){
+    .nav-top{display:none}
+    .hero-grid{grid-template-columns:1fr;gap:clamp(12px,2vh,18px)}
+    h1{font-size:clamp(23px,6.6vw,30px)}
+    .lead{max-width:none;font-size:13.5px}
+    .cards,.log{grid-template-columns:1fr}
+    .why{grid-template-columns:1fr;gap:8px}
+    .why .item{padding:11px 13px}
+    .why .item .k{margin-bottom:4px}
+    .dots{display:none}
+    .inner{padding:0 16px 70px}
+    .arrow{width:44px;height:44px;opacity:.5}
+  }
+  @media (max-height:640px){
+    .chips{display:none}
+    .dl .note{display:none}
+    .card p{font-size:12px}
+    .log .row div{font-size:11.5px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .rv,.pop{opacity:1!important;transform:none!important;transition:none!important}
+    .arrow.down,.arrow.up{animation:none}
+    .btn,.card,.why .item{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ============ 1 · 主展示 ============ -->
+  <section class="slide s1 on" id="s1">
+    <div class="inner">
+      <div class="brand rv" style="--d:.02s">
+        <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h11M4 17h14"/></svg></span>
+        <span>ClassFix</span>
+        <span class="ver">v1.6.3</span>
+      </div>
+
+      <div class="hero-grid">
+        <div>
+          <h1 class="rv" style="--d:.08s">教室电脑的<br><em>PPT 放映急救箱</em></h1>
+          <p class="lead rv" style="--d:.16s">打铃前三分钟才发现视频点不动、没声音、投屏不对——ClassFix 把这些问题提前到课前巡检，把「放映时才崩」变成「课前就修好」。</p>
+          <div class="chips rv" style="--d:.24s">
+            <span class="chip">免安装 · 双击即用</span>
+            <span class="chip">无需管理员权限</span>
+            <span class="chip">无需装 Python</span>
+            <span class="chip">检测只读，不改课件</span>
+            <span class="chip">云端 AI 诊断 · 积分制</span>
+          </div>
+        </div>
+
+        <div class="dl rv" style="--d:.2s">
+          <h2>下载 Windows 版</h2>
+          <p class="sub">Windows 10 / 11 · x64 · 解压后双击 ClassFix.exe</p>
+
+          <a class="btn btn-main" href="https://aiclass.openplays.cn/classfix/ClassFix-1.6.3-Windows-x64.zip" download="ClassFix-1.6.3-Windows-x64.zip">
+            <span>
+              <b>完整版 · 推荐</b>
+              <small>68.6 MB · 自带 FFprobe，教室机免装 FFmpeg · 支持程序内自动更新</small>
+            </span>
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/></svg></span>
+          </a>
+
+          <p class="sub" style="margin-top:12px;line-height:1.65;color:#f0b429"><b>已是 1.5.x？</b>打开「设置 → 软件更新 → 检查更新」即可在线升到 1.6.3（本次发布未附增量包，会下完整包）。<b>还是 1.3.x 及更早？</b>建议直接下载这里的新包覆盖安装——旧版的自动替换本身有问题（见下方更新记录）。<br><b>正卡在一个标题写着 <code>find /I "ClassFix.exe"</code> 的黑窗口上？</b>直接关掉它，别管它——然后用这里的完整包解压覆盖安装目录即可，覆盖不会丢你的设置和课件。</p>
+
+          <a class="btn btn-ghost" href="https://aiclass.openplays.cn/drop/f?id=mwihg3g9f40a17&amp;k=yhy-drop-9f3a">
+            <span>
+              <b>轻量版（1.1.7 最终）</b>
+              <small>37.0 MB · 需系统 PATH 中有 ffprobe · 不再更新</small>
+            </span>
+            <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#e2e8f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/></svg></span>
+          </a>
+
+          <p class="note">解压后请保留完整文件夹（含 <code>_internal</code>）再运行。<br>提供者：人大附中 · AI 前沿挑战实验室</p>
+        </div>
+      </div>
+
+      <div class="hero-foot rv" style="--d:.3s">
+        <button type="button" class="more" data-modal="req">运行要求 · 其他下载
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="nav-bottom">
+      <button class="arrow down" data-go="next" aria-label="下一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 2 · 解决什么 ============ -->
+  <section class="slide s2" id="s2">
+    <div class="nav-top">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="inner">
+      <div class="head rv">
+        <h2>它解决的是这几件具体的事</h2>
+        <span class="line"></span>
+      </div>
+
+      <div class="cards">
+        <article class="card pop" style="--d:.06s" role="button" tabindex="0" data-modal="m1">
+          <div class="top"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h3l5 4V5L7 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></span><h3>放映时低音量提醒</h3></div>
+          <p>视频在播、系统却静音或音量过低时，放映屏右下角滑出音量滑块，拖动即可调整，不会退出放映。</p>
+          <span class="hint">点击看细节</span>
+        </article>
+
+        <article class="card pop" style="--d:.13s" role="button" tabindex="0" data-modal="m2">
+          <div class="top"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M4 12h7M4 18h12"/><circle cx="18" cy="6" r="2"/><circle cx="17" cy="12" r="2"/><circle cx="19" cy="18" r="2"/></svg></span><h3>PPT 视频诊断向导</h3></div>
+          <p>点不动、报错、花屏、有画面无声音——按症状问、按依据答，最后给出一条明确的处理建议。</p>
+          <span class="hint">点击看细节</span>
+        </article>
+
+        <article class="card pop" style="--d:.2s" role="button" tabindex="0" data-modal="m3">
+          <div class="top"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span><h3>声音诊断</h3></div>
+          <p>用 Core Audio 读默认输出设备、系统静音与音量、输出端点，以及 PowerPoint 自己的音频会话。</p>
+          <span class="hint">点击看细节</span>
+        </article>
+
+        <article class="card pop" style="--d:.27s" role="button" tabindex="0" data-modal="m4">
+          <div class="top"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5l-5 8a2 2 0 0 0 1.7 3h12.6A2 2 0 0 0 20 17l-5-8V4"/><path d="M8 4h8"/></svg></span><h3>课前巡检</h3></div>
+          <p>一块屏幕上把显示器、网络、PowerPoint、摄像头与触控设备的状态过一遍，红灯早发现。</p>
+          <span class="hint">点击看细节</span>
+        </article>
+      </div>
+    </div>
+
+    <div class="nav-bottom">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+      <button class="arrow down" data-go="next" aria-label="下一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 3 · 为什么值得装 ============ -->
+  <section class="slide s3" id="s3">
+    <div class="nav-top">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="inner">
+      <div class="head rv">
+        <h2>为什么值得装</h2>
+        <span class="line"></span>
+      </div>
+
+      <div class="why">
+        <article class="item pop" style="--d:.06s" role="button" tabindex="0" data-modal="w1">
+          <span class="k">设计底线</span>
+          <b>只读，绝不改课件</b>
+          <span>所有检测都不写入、不转码、不重命名。课件包里一个字节都不会变，修不修、怎么修，决定权在老师手上。</span>
+        </article>
+
+        <article class="item pop" style="--d:.14s" role="button" tabindex="0" data-modal="w2">
+          <span class="k">不添乱</span>
+          <b>不在错误的时间弹窗</b>
+          <span>误报比不报警更伤人：视频还没点、翻到文字页、开着别的课件，一律不提示；同一次放映同一页只提醒一次。</span>
+        </article>
+
+        <article class="item pop" style="--d:.22s" role="button" tabindex="0" data-modal="w3">
+          <span class="k">隐私</span>
+          <b>数据留在本机</b>
+          <span>诊断记录存在本机数据库；AI 辅助分析是可选开关，只发送允许清单内的枚举与数值，不配置也能完整使用。</span>
+        </article>
+      </div>
+    </div>
+
+    <div class="nav-bottom">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+      <button class="arrow down" data-go="next" aria-label="下一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 4 · 更新报告 ============ -->
+  <section class="slide s4" id="s4">
+    <div class="nav-top">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="inner">
+      <div class="head rv">
+        <h2>v1.6.3 更新记录</h2>
+        <span class="line"></span>
+      </div>
+
+      <div class="log">
+        <div class="row pop" style="--d:.04s"><span class="tag g">新增</span><div><b>放映一出问题，自动给一份分层诊断</b>：课堂上视频黑屏时，过去只有一句「播放异常」。现在会把七路证据一起收上来再下结论——课件里视频是嵌入还是外链、引用是否还在；故障当刻的系统音量与静音状态；出问题的是第几页、哪个课件；PowerPoint 自己弹的报错原文；读取播放器状态时 COM 接口有没有返回错误；故障前后 10 秒内 PowerPoint 进程有没有崩溃或无响应；以及在故障窗口内抓的一小段进程过滤追踪（ETW）样本。每条证据都标「已确认 / 未取得」，不拿猜测当结论。</div></div>
+        <div class="row pop" style="--d:.09s"><span class="tag g">新增</span><div><b>提示框直接写出 PowerPoint 的报错原文</b>：右下角提示会写清第几页、检测依据是什么，并把 PowerPoint 弹出的报错原文附在后面。读不到时就明说「未读取到」，不会编一句原因糊弄。</div></div>
+        <div class="row pop" style="--d:.14s"><span class="tag g">新增</span><div><b>内存紧张时提醒，并可一键优化</b>：放映期间内存吃紧会在右下角提示，给出当前占用率，可一键执行内存优化（全局工作集、文件缓存、已修改页、待机页、低优先级待机页、注册表整理、物理页合并），也能「1 小时内不再提醒」或直接开任务管理器。优化在短命的独立进程里跑，做完即退。</div></div>
+        <div class="row pop" style="--d:.19s"><span class="tag">修复</span><div><b>多个提示不再互相遮挡</b>：音量弹窗与扫描告警同时出现时原来会互相盖掉。现在按屏幕位置排队展示、动画不重叠；音量滑条只在你拖完滑块之后才自动收起，不会拖到一半消失。</div></div>
+        <div class="row pop" style="--d:.24s"><span class="tag">修复</span><div><b>打开验证只关自己那份副本</b>：检查结束时只关闭它自己打开的临时副本。PowerPoint 里其它正在用的课件、以及你设置的提示偏好都保持原样，不会被一起关掉。</div></div>
+      </div>
+
+      <div class="rv prev" style="--d:.3s">上一版 v1.5.0：新增「打开验证」真的用 PowerPoint 打开一次并报页数与失败原因、安全模式对比、读事件日志与 WER 里的崩溃记录；只装 WPS 的电脑不再白等 25 秒；修托盘监视开关并补齐 pywin32。</div>
+
+      <div class="foot rv" style="--d:.46s">
+        <span>ClassFix v1.6.3 · Classroom Troubleshooting Assistant</span>
+        <span><a href="/drop/">文件投放站</a> · <button type="button" class="link-btn" data-modal="req">其他下载</button></span>
+      </div>
+    </div>
+
+    <div class="nav-bottom">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+      <button class="arrow down" data-go="top" aria-label="回到顶部">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></svg>
+      </button>
+    </div>
+  </section>
+</div>
+
+<nav class="dots on-dark" id="dots" aria-label="页面导航">
+  <button type="button" data-go="0" aria-label="第 1 屏 · 主展示"></button>
+  <button type="button" data-go="1" aria-label="第 2 屏 · 解决的事"></button>
+  <button type="button" data-go="2" aria-label="第 3 屏 · 为什么值得装"></button>
+  <button type="button" data-go="3" aria-label="第 4 屏 · 更新记录"></button>
+</nav>
+
+<dialog class="modal" id="modal" aria-labelledby="modalTitle">
+  <div class="panel" id="panel">
+    <button class="x" id="modalClose" aria-label="关闭">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div id="modalBody"></div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- 视口高度（兼容 iOS 地址栏） ---------- */
+  /* 触控设备：改用「原生滚动 + 滚动停止软吸附」，桌面保留轻滚 / 键盘切层 */
+  var touchMode = !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
+  function useTouchMode(){
+    if (touchMode) return;
+    touchMode = true;
+    document.body.classList.add('touch-mode');
+    setVH();
+  }
+  if (touchMode) document.body.classList.add('touch-mode');
+  window.addEventListener('touchstart', useTouchMode, { passive: true, once: true });
+
+  function setVH(){
+    /* 触控模式取 innerHeight（不用 visualViewport）：层高跟着地址栏变会让吸附点漂移 */
+    var h = Math.round(window.innerHeight || 0);
+    if (h > 0) document.documentElement.style.setProperty('--vh', h + 'px');
+  }
+  setVH();
+
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var dots = Array.prototype.slice.call(document.querySelectorAll('#dots button'));
+  var dotsBox = document.getElementById('dots');
+  var idx = 0, lock = 0, modalOpen = false;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function clamp(n){ return Math.max(0, Math.min(slides.length - 1, n)); }
+
+  /* 层内是否还能滚：只有「已经贴到边界（8px 内）」才允许切层 */
+  var EDGE = 8;
+  function innerOf(i){
+    return slides[i].querySelector('.inner');
+  }
+  function edgeState(i){
+    if (touchMode){
+      /* 触控模式没有层内独立滚动：层剩余内容由页面主轴承载 */
+      var s = slides[i], vh = window.innerHeight || 1, y = window.scrollY || 0;
+      var top = s.offsetTop, h = s.offsetHeight;
+      var sc = h - vh > 24;
+      return { scrollable: sc, atTop: !sc || y <= top + EDGE, atBottom: !sc || y + vh >= top + h - EDGE, inner: null };
+    }
+    var inner = innerOf(i);
+    if (!inner) return { scrollable: false, atTop: true, atBottom: true };
+    var scrollable = inner.scrollHeight - inner.clientHeight > 6;
+    return {
+      scrollable: scrollable,
+      atTop: !scrollable || inner.scrollTop <= EDGE,
+      atBottom: !scrollable || inner.scrollTop + inner.clientHeight >= inner.scrollHeight - EDGE,
+      inner: inner
+    };
+  }
+
+  /* 箭头跟随层内滚动状态：还在阅读时变淡，到边界才显眼 */
+  function syncArrows(){
+    var slide = slides[idx], st = edgeState(idx);
+    Array.prototype.forEach.call(slide.querySelectorAll('.arrow'), function(a){
+      var dir = a.getAttribute('data-go');
+      var idle = false;
+      if (dir === 'prev' || dir === 'up') idle = !st.atTop;
+      else if (dir === 'next' || dir === 'down' || dir === 'top') idle = !st.atBottom;
+      a.classList.toggle('idle', idle);
+    });
+  }
+
+  function paint(){
+    slides.forEach(function(s, i){
+      s.classList.toggle('on', i === idx);
+    });
+    dots.forEach(function(d, i){
+      d.classList.toggle('on', i === idx);
+      if (i === idx) d.setAttribute('aria-current', 'true');
+      else d.removeAttribute('aria-current');
+    });
+    dotsBox.classList.toggle('on-dark', idx === 0);
+  }
+
+  function go(n, instant){
+    if (modalOpen) return;
+    markActed();
+    n = clamp(n);
+    if (n === idx) return;
+    idx = n;
+    paint();
+    var target = innerOf(n);
+    if (target) target.scrollTop = 0;       /* 进入新层总是从顶部开始 */
+    syncArrows();
+    lock = Date.now() + 760;
+    var top = slides[n].offsetTop;
+    if (instant || reduce) window.scrollTo(0, top);
+    else {
+      window.scrollTo(0, window.scrollY || 0);   /* 先掐断触摸/触控板惯性，否则 smooth 会停半路 */
+      window.scrollTo({ top: top, behavior: 'smooth' });
+    }
+  }
+
+  /* ---------- 首次进入时播放入场动效 ---------- */
+  slides.forEach(function(s){ s.classList.remove('on'); });
+  requestAnimationFrame(function(){
+    slides[0].classList.add('on');
+    paint();
+    syncArrows();
+  });
+
+  /* ---------- 点击箭头 / 圆点 ---------- */
+  document.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('[data-go]') : null;
+    if (t){
+      var v = t.getAttribute('data-go');
+      e.preventDefault();
+      if (v === 'next') go(idx + 1);
+      else if (v === 'prev') go(idx - 1);
+      else if (v === 'top') go(0);
+      else go(parseInt(v, 10) || 0);
+      return;
+    }
+    var m = e.target.closest ? e.target.closest('[data-modal]') : null;
+    if (m){ e.preventDefault(); openModal(m.getAttribute('data-modal')); }
+  });
+
+  /* 键盘可达：Enter / Space 触发卡片 */
+  document.addEventListener('keydown', function(e){
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement &&
+        document.activeElement.hasAttribute && document.activeElement.hasAttribute('data-modal')){
+      e.preventDefault();
+      openModal(document.activeElement.getAttribute('data-modal'));
+    }
+  });
+
+  function markActed(){
+    if (!document.body.classList.contains('no-bob')) document.body.classList.add('no-bob');
+  }
+
+  /* ---------- 滚轮：轻滚即切层（仅桌面） ---------- */
+  var acc = 0, lastWheel = 0;
+  window.addEventListener('wheel', function(e){
+    if (touchMode) return;                       /* 触控模式一律交给原生滚动 */
+    if (modalOpen) return;
+    if (e.ctrlKey) return;
+    markActed();
+
+    var st = edgeState(idx);
+    if (st.scrollable) {
+      if (!((e.deltaY < 0 && st.atTop) || (e.deltaY > 0 && st.atBottom))) {
+        syncArrows();
+        return;                                  /* 层内还能滚：先让内容滚 */
+      }
+    }
+
+    e.preventDefault();
+    var now = Date.now();
+    if (now - lastWheel > 240) acc = 0;
+    lastWheel = now;
+    if (now < lock) { acc = 0; return; }
+
+    acc += (e.deltaMode === 1 ? e.deltaY * 18 : e.deltaY);
+    if (Math.abs(acc) >= 26){
+      go(idx + (acc > 0 ? 1 : -1));
+      acc = 0;
+    }
+  }, { passive: false });
+
+  /* ---------- 触摸：触控模式 = 增益拖动（页面位移 = 手指 × GAIN）+ 方向翻页 ----------
+     原生滚动是 1:1，改不了比例，所以触控下由脚本接管拖动（touch-action:none + preventDefault）。
+     手指动 ≥6px 即定方向，松手直奔该方向前方最近的可停点；任何位置松手都会落到某一页上。 */
+  var GAIN = 1.60, DIR_TOL = 6;
+  var INTERACTIVE = 'a,button,input,select,textarea,label,summary,[role="button"],[contenteditable],#hud';
+  var tY = 0, tX = 0, tracking = false;
+  var touching = false;
+  var drag = { on: false, startCY: 0, base: 0, moved: 0, finger: 0 };
+  var grab = { active: false, dir: 0, target: null };
+
+  window.addEventListener("touchstart", function(e){
+    if (modalOpen) return;
+    touching = true;
+    cancelSnap();                                 /* 新的一下开始了，撤掉未执行的吸附 */
+    var tip = e.target;
+    if (tip && tip.closest && tip.closest(INTERACTIVE)){
+      drag.on = false;                            /* 点在按钮 / 链接 / 输入控件上：不接管，交给浏览器出 click */
+      return;
+    }
+    if (touchMode){
+      if (e.cancelable) e.preventDefault();
+      var t = e.touches && e.touches[0];
+      drag.on = true;
+      drag.startCY = t ? t.clientY : 0;
+      drag.base = window.scrollY || 0;
+      drag.moved = 0; drag.finger = 0;
+      grab.active = false; grab.target = null;
+      stopSnapAnim();
+      ensureTick();
+      return;
+    }
+    if (e.touches.length !== 1){ tracking = false; return; }
+    tY = e.touches[0].clientY; tX = e.touches[0].clientX; tracking = true;
+  }, {passive:false});
+
+  function touchEnded(){
+    touching = false;
+    if (!touchMode || !drag.on) return;
+    drag.on = false;
+    var dir = drag.moved > 0 ? 1 : (drag.moved < 0 ? -1 : 0);
+    var y = window.scrollY || 0;
+    var tgt = null;
+    if (drag.finger >= DIR_TOL && dir !== 0) tgt = dir > 0 ? nextStop(y) : prevStop(y);
+    var near = nearestStop(y);
+    if (!tgt || near.d <= 12) tgt = near.p;       /* 几乎正落在某一页上：直接吸它 */
+    grab.dir = dir || (tgt.y > y ? 1 : -1);
+    grab.target = tgt;
+    grab.active = true;
+    lock = Date.now() + 380;
+    ensureTick();
+  }
+  window.addEventListener("touchend", touchEnded, {passive:true});
+  window.addEventListener("touchcancel", touchEnded, {passive:true});
+
+  /* ---------- 嵌在 iframe（rdfzai 课件等）里的外链 ----------
+     srcdoc 沙箱给了 allow-popups allow-popups-to-escape-sandbox 但没有 allow-downloads，
+     直接在同 iframe 导航会把课件顶掉、也可能被拦，所以外链一律新窗口打开；
+     新窗口被拦时退回当前 iframe 导航。 */
+  function frameHint(msg){
+    var box = document.createElement("div");
+    box.textContent = msg;
+    box.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:88%;" +
+      "background:rgba(17,24,39,.95);color:#fff;font-size:13px;line-height:1.6;padding:10px 16px;" +
+      "border-radius:10px;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;" +
+      "transition:opacity .22s;pointer-events:none;text-align:center";
+    document.body.appendChild(box);
+    requestAnimationFrame(function(){ box.style.opacity = "1"; });
+    setTimeout(function(){ box.style.opacity = "0"; setTimeout(function(){ if (box.parentNode) box.parentNode.removeChild(box); }, 320); }, 5200);
+  }
+  function fallbackCopy(txt){
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = txt;
+      ta.setAttribute("readonly", "readonly");
+      ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:.02;border:0;padding:0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, txt.length);
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch(err){}
+  }
+  function copyText(txt){
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(function(){}, function(){ fallbackCopy(txt); });
+        return;
+      }
+    } catch(err){}
+    fallbackCopy(txt);
+  }
+  (function(){
+    var framed = false;
+    try { framed = window.top !== window.self; } catch(err){ framed = true; }
+    if (!framed) return;                          /* 独立打开（静态站/本地）：浏览器原生 a[download] 直接下载 */
+    document.addEventListener("click", function(e){
+      var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a) return;
+      var href = a.getAttribute("href") || "";
+      if (!href || href.charAt(0) === "#") return;
+      var abs = a.href;
+      var raw = abs.split("#")[0].split("?")[0];
+      var isFile = a.hasAttribute("download") || /\.(zip|exe|msi|dmg|7z|rar|patch)$/i.test(raw);
+      if (!isFile){                               /* 普通外链：新窗口打开 */
+        e.preventDefault();
+        var w = null;
+        try { w = window.open(abs, "_blank", "noopener"); } catch(err){}
+        if (!w){ try { location.href = abs; } catch(err2){} }
+        return;
+      }
+      /* 文件：先按原生方式触发下载（课件沙箱允许就直接落盘），同时把链接复制到剪贴板兜底。
+         注：课件 iframe 若未开 allow-downloads，浏览器会静默拦掉下载，所以必须给提示与可复制的链接。 */
+      var name = raw.split("/").pop() || "文件";
+      copyText(abs);
+      frameHint("正在下载 " + name + "；若几秒后没有开始，下载链接已复制——长按下面的「下载」按钮也能复制，粘到浏览器地址栏打开即可");
+    }, true);
+  })();
+
+  window.addEventListener("touchmove", function(e){
+    var t = e.touches && e.touches[0];
+    if (touchMode){
+      if (!drag.on || !t) return;
+      if (e.cancelable) e.preventDefault();
+      var d0 = drag.startCY - t.clientY;          /* 手指上滑为正 = 往下一层走 */
+      drag.finger = Math.abs(d0);
+      var mx = Math.max(0, (document.documentElement.scrollHeight || 0) - (window.innerHeight || 1));
+      var to = drag.base + d0 * GAIN;
+      to = to < 0 ? 0 : (to > mx ? mx : to);
+      window.scrollTo(0, to);
+      drag.moved = to - drag.base;
+      return;
+    }
+    if (!tracking) return;
+    markActed();
+    var dy = tY - e.touches[0].clientY;
+    var dx = Math.abs(tX - e.touches[0].clientX);
+    if (dx > Math.abs(dy)) return;
+    var st = edgeState(idx);
+    if (st.scrollable){
+      if (!((dy < 0 && st.atTop) || (dy > 0 && st.atBottom))){
+        syncArrows();
+        return;
+      }
+    }
+    if (Math.abs(dy) > 26){
+      if (e.cancelable) e.preventDefault();
+      tracking = false;
+      go(idx + (dy > 0 ? 1 : -1));
+    }
+  }, {passive:false});
+
+
+  /* ---------- 键盘 ----------
+     弹层打开时一律不拦截（Esc 由原生 dialog 负责）。
+     焦点在按钮/链接/可交互元素上时把按键还原给浏览器——否则空格无法激活按钮。
+     层内容高于一屏时（桌面层内是独立滚动容器），方向键先滚层内，到边界才切层。 */
+  window.addEventListener('keydown', function(e){
+    if (modalOpen) return;
+    var t = e.target;
+    if (t && t.closest && t.closest('button,a,[role="button"],input,textarea,select,summary')) return;
+    var st = touchMode ? null : edgeState(idx);
+    if (st && st.scrollable){
+      var page = st.inner.clientHeight * 0.85;
+      if ((e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') && !st.atBottom){
+        e.preventDefault();
+        st.inner.scrollBy({ top: e.key === 'ArrowDown' ? 120 : page, behavior: reduce ? 'auto' : 'smooth' });
+        syncArrows();
+        return;
+      }
+      if ((e.key === 'ArrowUp' || e.key === 'PageUp') && !st.atTop){
+        e.preventDefault();
+        st.inner.scrollBy({ top: e.key === 'ArrowUp' ? -120 : -page, behavior: reduce ? 'auto' : 'smooth' });
+        syncArrows();
+        return;
+      }
+    }
+    if (['ArrowDown', 'PageDown', ' '].indexOf(e.key) > -1){ e.preventDefault(); go(idx + 1); }
+    else if (['ArrowUp', 'PageUp'].indexOf(e.key) > -1){ e.preventDefault(); go(idx - 1); }
+    else if (e.key === 'Home'){ e.preventDefault(); go(0); }
+    else if (e.key === 'End'){ e.preventDefault(); go(slides.length - 1); }
+  });
+
+  /* ---------- 当前层同步 ---------- */
+  var scrollT = 0;
+
+  function syncIdx(n){
+    n = clamp(n);
+    if (n === idx) return;
+    idx = n;
+    paint();
+    syncArrows();
+  }
+
+  /* 触控模式的层判定：取「可见高度最大」的层，层高不一时也不会判错 */
+  function idxFromScroll(){
+    var vh = window.innerHeight || 1, y = window.scrollY || 0;
+    var best = 0, bestV = -1e9;
+    for (var i = 0; i < slides.length; i++){
+      var s = slides[i];
+      var vis = Math.min(y + vh, s.offsetTop + s.offsetHeight) - Math.max(y, s.offsetTop);
+      if (vis > bestV){ bestV = vis; best = i; }
+    }
+    return best;
+  }
+
+  /* ---------- 触控分页引擎 ----------
+     停点 = 各层顶 + 长内容层的「内容底边对齐屏底」；任何位置松手都落到某一停点上（必吸）。
+     绝不接管惯性（没有任何"惯性中改位置"的代码），松手后只做一次自绘缓动跑向目标。 */
+  var SNAP_STILL_MS = 40;
+  var snapRaf = 0, snapAnimRaf = 0, lastY = 0, stillSince = 0;
+
+  function stopPoints(){
+    var H = window.innerHeight || 1, a = [];
+    for (var i = 0; i < slides.length; i++){
+      var s = slides[i], ex = s.offsetHeight - H;
+      a.push({ y: Math.round(s.offsetTop), i: i });
+      if (ex > 24) a.push({ y: Math.round(s.offsetTop + ex), i: i });
+    }
+    a.sort(function(p, q){ return p.y - q.y; });
+    return a;
+  }
+  function nextStop(y){
+    var a = stopPoints();
+    for (var i = 0; i < a.length; i++) if (a[i].y > y + 2) return a[i];
+    return a[a.length - 1];
+  }
+  function prevStop(y){
+    var a = stopPoints();
+    for (var i = a.length - 1; i >= 0; i--) if (a[i].y < y - 2) return a[i];
+    return a[0];
+  }
+  function nearestStop(y){
+    var a = stopPoints(), best = a[0], bd = Infinity;
+    for (var i = 0; i < a.length; i++){
+      var d = Math.abs(a[i].y - y);
+      if (d < bd){ bd = d; best = a[i]; }
+    }
+    return { p: best, d: bd };
+  }
+
+  function stopSnapAnim(){ if (snapAnimRaf){ cancelAnimationFrame(snapAnimRaf); snapAnimRaf = 0; } }
+  function cancelSnap(){ stopSnapAnim(); grab.active = false; grab.target = null; }
+
+  /* 自绘缓动：松手后「跑」向目标页，快起慢收（无惯性拖尾，用户明确不要） */
+  function animateTo(target){
+    stopSnapAnim();
+    var from = window.scrollY || 0, dist = target - from;
+    if (Math.abs(dist) < 1.2) return;
+    if (reduce){ window.scrollTo(0, target); return; }
+    var dur = Math.max(200, Math.min(560, Math.abs(dist) * 0.42));
+    var t0 = 0;
+    function step(ts){
+      if (!t0) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur);
+      var e = 1 - Math.pow(1 - k, 4);
+      window.scrollTo(0, from + dist * e);
+      if (k < 1) snapAnimRaf = requestAnimationFrame(step);
+      else { snapAnimRaf = 0; window.scrollTo(0, target); }
+    }
+    snapAnimRaf = requestAnimationFrame(step);
+  }
+
+  function ensureTick(){
+    if (!touchMode) return;
+    if (!snapRaf) snapRaf = requestAnimationFrame(foldTick);
+  }
+
+  function foldTick(){
+    snapRaf = 0;
+    if (!touchMode) return;
+    if (modalOpen) return;
+    snapRaf = requestAnimationFrame(foldTick);
+    var y = window.scrollY || 0;
+    if (touching || snapAnimRaf){ lastY = y; stillSince = 0; return; }
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    if (Math.abs(y - lastY) > 0.5){ lastY = y; stillSince = 0; }
+    else if (!stillSince){ stillSince = now; }
+    var stillMs = stillSince ? now - stillSince : 0;
+
+    if (grab.active){
+      var tgt = grab.target;
+      if (!tgt){ grab.active = false; return; }
+      if (Math.abs(y - tgt.y) < 4){ grab.active = false; syncIdx(nearestStop(y).p.i); return; }
+      grab.active = false;
+      animateTo(tgt.y);
+      return;
+    }
+    if (stillMs >= SNAP_STILL_MS){
+      var n = nearestStop(y);
+      if (n.d > 1) animateTo(n.p.y);
+      else if (n.d > 0.5) window.scrollTo(0, n.p.y);
+    }
+  }
+
+
+  /* ---------- 原生滚动同步（触控板/手机惯性） ---------- */
+  window.addEventListener('scroll', function(){
+    if (touchMode) ensureTick();                    /* 惯性一停（位置不再变化）就吸附，不排队等 240ms */
+    var now = Date.now();
+    if (now - scrollT < 60) return;
+    scrollT = now;
+    if (touchMode){ syncIdx(idxFromScroll()); return; }
+    if (now < lock) return;                      /* 程序化平滑滚动中不要回改 idx */
+    var h = slides[0].offsetHeight || 1;
+    syncIdx(Math.round((window.scrollY || 0) / h));
+  }, { passive: true });
+
+  /* ---------- 层内滚动（第 4 层更新报告等）：只影响箭头显隐 ---------- */
+  slides.forEach(function(s, i){
+    var inner = s.querySelector('.inner');
+    if (!inner) return;
+    inner.addEventListener('scroll', function(){
+      if (i === idx) syncArrows();
+    }, { passive: true });
+  });
+
+  window.addEventListener('resize', function(){
+    if (touchMode){                              /* 不跟地址栏伸缩改层高：层高一变吸附点就漂移 */
+      syncArrows();
+      clearTimeout(window.__rz);
+      window.__rz = setTimeout(syncArrows, 200);
+      return;
+    }
+    setVH();
+    syncArrows();
+    clearTimeout(window.__rz);
+    window.__rz = setTimeout(function(){
+      if (!modalOpen) window.scrollTo(0, slides[idx].offsetTop);
+      syncArrows();
+    }, 140);
+  });
+
+  window.addEventListener('orientationchange', function(){
+    if (!touchMode) return;
+    setTimeout(function(){
+      setVH();
+      window.scrollTo(0, slides[idx].offsetTop);
+      syncArrows();
+    }, 320);
+  });
+
+  /* ---------- 弹窗 ---------- */
+  var modal = document.getElementById('modal');
+  var panel = document.getElementById('panel');
+  var body = document.getElementById('modalBody');
+
+  var DATA = {
+    m1: { t: '放映时低音量提醒', s: '只要视频真的在播、系统却没声，提示自己出现。', b:
+      '<ul>' +
+      '<li><b>触发条件</b>：当前放映页确实含视频 + 视频处于播放状态 + 系统静音或音量低于阈值（默认 25%，可在设置里调 5~80%）。</li>' +
+      '<li><b>面板形态</b>：放映屏右下角、深色圆角、Windows 通知式上滑动画；置顶但不抢走 PowerPoint 的键盘焦点。</li>' +
+      '<li><b>可直接处理</b>：拖动滑块调整的是 Windows 默认媒体输出的系统总音量，拖动过程不会退出放映。</li>' +
+      '<li><b>不打扰</b>：同一次放映同一页只提示一次；音量恢复正常时提示自动收起；退出放映后重置。</li>' +
+      '</ul>' },
+    m2: { t: 'PPT 视频诊断向导', s: '四步走完，结论后面挂着可核对的事实。', b:
+      '<ul>' +
+      '<li><b>流程</b>：选择文件 → 定位视频页 → 按症状回答问题 → 结果与复测。</li>' +
+      '<li><b>支持格式</b>：.pptx / .pptm / .ppsx / .ppsm / .potx / .potm；旧版 .ppt 需先在 PowerPoint 另存。</li>' +
+      '<li><b>判定依据</b>：用课件内部「幻灯片 ↔ 媒体」关系表区分嵌入与外链；用 FFprobe 读真实容器与码流；判据是 PowerPoint 推荐的 <b>MP4 + H.264 + AAC</b>，不看扩展名。</li>' +
+      '<li><b>复测</b>：改完课件点「重新检测」看变化；放映后记「已恢复 / 仍有故障」，保留首次证据。</li>' +
+      '<li><b>边界会说明</b>：网页 / UNC / 映射共享链接显示「尚未检测」；嵌入媒体大于 512 MB 建议先导出再单独探测。</li>' +
+      '</ul>' },
+    m3: { t: '声音诊断', s: '分清「系统没声」和「PPT 这个会话没声」。', b:
+      '<ul>' +
+      '<li>读取默认媒体输出设备、系统静音与总音量、系统识别到的输出端点。</li>' +
+      '<li>读取 PowerPoint 进程的音频会话：会话在不在、有没有输出。</li>' +
+      '<li><b>更准的用法</b>：在 PowerPoint 正播放有声内容时复测，能区分应用音量与实际输出端点问题。</li>' +
+      '<li>页面按钮直接打开 Windows「声音设置」与「音量混合器」，不在设置里翻找。</li>' +
+      '</ul>' },
+    m4: { t: '课前巡检', s: '一块屏幕上过一遍，红灯早发现。', b:
+      '<ul>' +
+      '<li><b>显示</b>：读取全部显示路径（含未激活的），直接判出 Win+P 实际模式——复制／扩展／仅电脑屏幕／仅第二屏幕，能识别「投影接好了但没投出去」；注册表里历史遗留的幽灵输出会被过滤，不会误报「8 个外接输出已连接」。</li>' +
+      '<li><b>投影投出验证</b>：一键让副屏闪 4 秒蓝色提示，抬头看到就算确认，结果存入本机设置。</li>' +
+      '<li><b>网络</b>：Windows 网络连接分类与 Internet 可达性（注明这是操作系统检测结果）。</li>' +
+      '<li><b>Office</b>：读 PowerPoint 的 COM 自动化登记判断放映接口是否可用；<b>WPS 冒充的假绿灯会被识破</b>（按安装路径判定，不信它自报的版本号），还可以「实测放映接口」真实调用一次。</li>' +
+      '<li><b>外设</b>：通过即插即用枚举摄像头与触控设备。</li>' +
+      '<li><b>声音</b>：默认输出、系统静音与音量；已知输出里只展开能用的，其余折进「查看全部」。</li>' +
+      '<li>结果自动入库，首页「设备状态」直接引用最近一次。</li>' +
+      '</ul>' },
+    w1: { t: '只读，绝不改课件', s: '这条是硬约束，不是宣传语。', b:
+      '<ul>' +
+      '<li>全部检测只读取课件包内部结构，不写入、不转码、不重命名、不移动文件。</li>' +
+      '<li>修复动作由使用者通过 PowerPoint 或 Windows 设置执行——工具不替你做主。</li>' +
+      '<li>后台扫描不显示进度窗口，也不在课件里留下任何改动。</li>' +
+      '</ul>' },
+    w2: { t: '不在错误的时间弹窗', s: '误报比不报警更伤人。', b:
+      '<ul>' +
+      '<li>视频还没点（PowerPoint 暂时返回未就绪）时，不据此报警。</li>' +
+      '<li>翻到纯文字页、放映另一份课件时，不弹提示（旧版会弹错页，1.1.7 已修）。</li>' +
+      '<li>同一页来回翻只提示一次；两个提示（音量 / 格式）不会叠在右下角。</li>' +
+      '<li>双屏扩展放映时，提示只出现在放映所在的那块屏。</li>' +
+      '</ul>' },
+    w3: { t: '数据留在本机', s: '联网是可选项，不是前提。', b:
+      '<ul>' +
+      '<li>诊断记录存在本机 SQLite：<code>%LOCALAPPDATA%\\ClassFix\\classfix.sqlite3</code>，不随账号上传。</li>' +
+      '<li>AI 辅助分析两条通道都默认不自动触发：每次点「分析」前先给你看完整摘要，确认才发。登录账号走云端（消耗积分），填自己的密钥则直连服务商（不消耗积分）。</li>' +
+      '<li>无论走哪条通道，只发送允许清单内的检查状态、编码枚举、数值与选择题答案；课件、视频、文件路径、设备名、原始日志都不上传。</li>' +
+      '<li>云端只留「离线流程没覆盖到的问题」条目与 AI 给出的建议，不保存整份检测摘要原文。</li>' +
+      '</ul>' },
+    req: { t: '运行要求 · 其他下载', s: '装之前先看一眼这几条。', b:
+      '<ul>' +
+      '<li>Windows 10 22H2 或 Windows 11，x64；课前巡检同时给出 Microsoft PowerPoint 与 WPS 演示两条结论——只装了 WPS 不算故障，「实测放映接口」在 WPS 下也会真起一次放映来验证（WPS 读不到页码与音量提示，放映时按「人工确认画面」使用）。</li>' +
+      '<li>1.4.1 起升级只下载变化的文件：差异包超过完整包一半或 24 MB、或 Python / PySide6 版本不匹配时自动改用完整包。本次 1.6.3 发布未附增量包，1.5.x 会在线上直接下完整包；后续版本可继续走增量。</li>' +
+      '<li>云端 AI 诊断需手机号验证码登录（注册送 10 积分，每天再赠 5 积分）；不想登录可以在设置里填自己的 API 密钥直连。</li>' +
+      '<li>完整版已自带 FFprobe 与许可文本，无需另装 FFmpeg；免安装、免管理员权限。</li>' +
+      '<li>1.2.0 起支持程序内更新：能联网的机器自动检查，教室机不能联网时用「设置 → 软件更新 → 从文件更新」。</li>' +
+      '<li>记录位置 <code>%LOCALAPPDATA%\\ClassFix\\classfix.sqlite3</code>；移动文件夹后需重新保存一次开机自启。</li>' +
+      '</ul>' +
+      '<div class="files">' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mwjebbzpfdaa29&amp;k=yhy-drop-9f3a"><span>云端账号与积分说明（两条通道 / 积分规则 / 规则包怎么用）</span><em>4.8 KB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mwjbial8cd1bc3&amp;k=yhy-drop-9f3a"><span>1.2.0 更新机制说明（怎么升级 / 怎么发版）</span><em>4.7 KB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mwizasgkde4292&amp;k=yhy-drop-9f3a"><span>完整功能说明（1.1.7 归档）</span><em>26 KB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mww3pmaq8062cc&amp;k=yhy-drop-9f3a"><span>完整源码包 v1.6.3（播放失败分层诊断 / 报错原文 / 内存一键优化 / 提示不遮挡）</span><em>263 KB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/storage/v1/object/public/classfix-files/patches/ClassFix-1.4.0-to-1.4.1.patch.zip"><span>1.4.0 → 1.4.1 增量包（历史 · 手动升级用 · 2.68 MB）</span><em>2.7 MB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mwihl1bm5612ee&amp;k=yhy-drop-9f3a"><span>1.1.5 → 1.1.7 增量补丁（历史）</span><em>29 KB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mwihl1vh15dd38&amp;k=yhy-drop-9f3a"><span>1.1.7 交付说明</span><em>9 KB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mwizb5if10095d&amp;k=yhy-drop-9f3a"><span>成品冒烟报告（Windows 11 实测）</span><em>3.6 KB</em></a>' +
+      '<a class="file" href="https://aiclass.openplays.cn/drop/f?id=mwihl5dr839032&amp;k=yhy-drop-9f3a"><span>FFmpeg 许可文本（GPLv3）</span><em>36 KB</em></a>' +
+      '</div>' }
+  };
+
+  function openModal(key){
+    var d = DATA[key];
+    if (!d) return;
+    body.innerHTML = '<h3 id="modalTitle">' + d.t + '</h3><p class="m-sub">' + d.s + '</p>' + d.b;
+    modalOpen = true;
+    try {
+      if (typeof modal.showModal === 'function') modal.showModal();
+      else modal.setAttribute('open', '');      /* 极旧浏览器兜底：能看能关，没有焦点陷阱 */
+    } catch (err) {
+      modal.setAttribute('open', '');
+    }
+    var x = document.getElementById('modalClose');
+    if (x) x.focus({ preventScroll: true });
+  }
+
+  function closeModal(){
+    if (typeof modal.close === 'function' && modal.open) modal.close();
+    else modal.removeAttribute('open');
+    modalOpen = false;
+  }
+
+  /* Esc、手机返回手势、将来若有表单提交都会触发 close：状态以 close 事件为准 */
+  modal.addEventListener('close', function(){ modalOpen = false; });
+
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+
+  /* ---------- 首屏自动提示一次箭头（3 秒后轻微上下） ---------- */
+  if (!reduce) {
+    setTimeout(function(){
+      var a = slides[0].querySelector('.arrow.down');
+      if (a) a.style.transition = 'opacity .4s';
+    }, 1200);
+  }
+})();
+</script>
+</body>
+</html>

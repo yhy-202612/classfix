@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ClassFix · 课堂 PPT 出问题之前就修好</title>
+<meta name="description" content="ClassFix 常驻教室电脑，在 PowerPoint 打开前拦下会导致报错、白屏、提示不消失的问题。">
+<link rel="canonical" href="https://aiclass.openplays.cn/classfix-eeo/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ClassFix">
+<meta property="og:title" content="ClassFix · 课堂 PPT 出问题之前就修好">
+<meta property="og:description" content="常驻教室电脑，在 PowerPoint 打开前拦下会导致报错、白屏、提示不消失的问题。">
+<meta property="og:url" content="https://aiclass.openplays.cn/classfix-eeo/">
+<meta property="og:image" content="https://aiclass.openplays.cn/classfix/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script>document.documentElement.classList.add('js')</script>
+<style>
+:root{
+  --blue:#1a63f4;
+  --blue-d:#0f47c4;
+  --blue-l:#eaf1ff;
+  --blue-ll:#f6f9ff;
+  --ink:#0f1e3d;
+  --ink-2:#33456b;
+  --muted:#63769b;
+  --line:#dbe6fb;
+  --white:#fff;
+  --shadow:0 18px 50px -22px rgba(18,54,128,.34);
+  --shadow-s:0 8px 24px -14px rgba(18,54,128,.36);
+  --ease:cubic-bezier(.2,.72,.2,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{scroll-behavior:auto;overflow-anchor:none}  /* 关掉滚动锚点：入场动画/展开改变内容高度时浏览器会自己挪 scrollY，正是「突然一跳」的来源 */
+body{
+  background:var(--white);color:var(--ink);
+  font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;line-height:1.6;overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+button{font:inherit}
+::selection{background:#c9dcff}
+
+/* ================= 分屏骨架 ================= */
+.deck{position:relative}
+.slide{
+  position:relative;height:var(--vh,100vh);display:flex;flex-direction:column;
+  overflow:hidden;background:var(--white);
+}
+/* 动态视口高度：地址栏伸缩/旋转时自动跟随，不依赖 JS 时机 */
+@supports(height:100dvh){ .slide{height:100dvh} }
+.slide .inner{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;justify-content:center;
+  justify-content:safe center; /* 内容高于屏时保证顶部不被裁掉、能滚到第一行 */
+  padding:clamp(64px,7.4vh,92px) clamp(18px,4.6vw,46px) clamp(70px,8vh,96px);
+  scrollbar-width:none;
+}
+.slide .inner::-webkit-scrollbar{width:0;height:0}
+.wrap{width:min(1240px,100%);margin:0 auto}
+
+/* ================= 触控设备：单滚动轴 + 滚动停止软吸附 =================
+   手机端不再由 JS 拖拽切层（touchstart 是 passive、26px 后才 preventDefault，
+   此时原生滚动已起步，两套位移叠加 + scroll 回改 idx 就是「瞬移 / 吸附错乱」的根源）。
+   改为：层高自然撑开、页面只剩一条滚动轴、惯性交给浏览器，
+   JS 只在滚动真正停止后判断「是否滑过一层的一半」，再对齐到该层顶部。 */
+html,body{overscroll-behavior-y:none}
+body.touch-mode{touch-action:none}      /* 拖动由脚本接管，禁掉浏览器自身滚动 */
+body.touch-mode .slide{
+  height:auto;min-height:var(--vh,100vh);
+}
+@supports(height:100dvh){
+  body.touch-mode .slide{min-height:100dvh}   /* 跟随地址栏伸缩填满，避免层底露出一条下一层 */
+}
+body.touch-mode .slide .inner{
+  flex:1 0 auto;overflow:visible;overscroll-behavior:auto;
+}
+/* 箭头保持随层定位（不设 fixed）：层高=一屏时它就在视口底；
+   层内容高于一屏时它落在层底，滚到底才出现——避免浮动箭头一路压住正文。 */
+
+/* ================= 顶部导航（仅第 1 层） ================= */
+.nav{
+  position:fixed;inset:0 0 auto 0;z-index:60;height:60px;display:flex;align-items:center;
+  padding:0 clamp(18px,4vw,46px);
+  background:rgba(255,255,255,.8);backdrop-filter:blur(16px) saturate(1.4);
+  -webkit-backdrop-filter:blur(16px) saturate(1.4);
+  border-bottom:1px solid rgba(219,230,251,.9);
+  transition:opacity .45s var(--ease),transform .45s var(--ease);
+}
+body:not(.on-s1) .nav{opacity:0;transform:translateY(-100%);pointer-events:none}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;color:inherit;text-align:left}
+.brand i{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(150deg,#2f7bff,#1450d8);box-shadow:0 6px 14px -7px rgba(26,99,244,.85)}
+.brand i svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+.nav-links{margin-left:auto;display:flex;align-items:center;gap:clamp(12px,2vw,26px);font-size:14px;color:var(--ink-2)}
+.nav-links a,.nav-links button{position:relative;padding:6px 0;transition:color .2s;background:none;border:0;cursor:pointer;font:inherit;color:inherit}
+.nav-links a:hover,.nav-links button:hover{color:var(--blue)}
+.nav-links a::after,.nav-links button::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--blue);border-radius:2px;transform:scaleX(0);transform-origin:left;transition:transform .34s var(--ease)}
+.nav-links a:hover::after,.nav-links button:hover::after{transform:scaleX(1)}
+.nav-cta{padding:9px 17px;border-radius:11px;background:var(--blue);color:#fff !important;font-size:13.5px;font-weight:600;box-shadow:0 10px 22px -12px rgba(26,99,244,.95);transition:transform .22s var(--ease),background .2s}
+.nav-cta:hover{transform:translateY(-1px);background:var(--blue-d)}
+.nav-cta::after{display:none}
+
+/* ================= 箭头 ================= */
+.nav-top{position:absolute;left:0;right:0;top:max(16px,env(safe-area-inset-top));display:none;justify-content:center;z-index:30}
+.nav-bottom{position:absolute;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));display:flex;gap:10px;justify-content:center;z-index:30}
+.arrow{
+  width:42px;height:42px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  background:rgba(255,255,255,.88);border:1px solid var(--line);color:var(--ink-2);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:0 10px 22px -16px rgba(18,54,128,.8);
+  opacity:.55;transition:opacity .34s var(--ease),transform .26s var(--ease),box-shadow .26s var(--ease);
+  animation:bob 2.9s ease-in-out infinite;
+}
+.arrow svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.arrow:hover{opacity:1;transform:translateY(-2px);box-shadow:0 16px 28px -16px rgba(18,54,128,.9)}
+.arrow.idle{opacity:.35}
+.arrow.idle:hover{opacity:.75}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+body.no-bob .arrow{animation:none !important}
+
+/* ================= 右侧圆点 ================= */
+.dots{position:fixed;right:clamp(10px,1.6vw,22px);top:50%;transform:translateY(-50%);z-index:55;display:flex;flex-direction:column;gap:11px;opacity:0;transition:opacity .4s}
+.dots.on{opacity:1}
+.dots button{width:24px;height:24px;padding:0;border-radius:99px;border:0;cursor:pointer;background:none;transition:all .3s var(--ease);display:grid;place-items:center}
+.dots button::before{content:"";display:block;width:8px;height:8px;border-radius:99px;background:#c3d4f0;transition:all .3s var(--ease)}
+.dots button.on::before{background:var(--blue);height:26px}
+.dots button:hover::before{background:#8fb2ee}
+@media (pointer:coarse){.dots button{width:36px;height:36px}}
+.dots{gap:0}
+
+/* ================= 渐进文字 =================
+   初始隐藏态只在 html.js 下生效：脚本没跑起来时文字照常显示，
+   否则 .line 的 overflow:hidden + translateY(115%) 会把整页文字推出可视区。 */
+.line{display:block;overflow:hidden;padding-bottom:.06em}
+html.js .line>span{display:block;transform:translateY(115%);transition:transform .92s var(--ease);transition-delay:var(--d,0s)}
+html.js .in .line>span,html.js .line.in>span{transform:translateY(0)}
+html.js .up{opacity:0;transform:translate3d(0,60px,0);transition:opacity .7s var(--ease),transform .7s var(--ease);transition-delay:var(--d,0s)}
+html.js .in .up,html.js .up.in{opacity:1;transform:none}
+.ul{position:relative;white-space:nowrap}
+.ul::after{
+  content:"";position:absolute;left:-.02em;right:-.02em;bottom:-.04em;height:.14em;border-radius:99px;
+  background:linear-gradient(90deg,rgba(26,99,244,.28),rgba(26,99,244,.55));
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .78s var(--ease);transition-delay:var(--du,.5s);
+}
+.in .ul::after,.ul.in::after{transform:scaleX(1)}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--blue);
+  padding:5px 11px;border-radius:99px;background:var(--blue-l);
+}
+.eyebrow b{width:5px;height:5px;border-radius:50%;background:var(--blue);display:block}
+
+/* ================= 第 1 层 ================= */
+.s1{background:radial-gradient(1100px 620px at 82% -8%,#e5eeff 0%,rgba(229,238,255,0) 62%),radial-gradient(760px 520px at 6% 12%,#f0f5ff 0%,rgba(240,245,255,0) 60%),#fff}
+.s1::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(26,99,244,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(26,99,244,.055) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(72% 62% at 50% 32%,#000 0%,transparent 78%);
+  -webkit-mask-image:radial-gradient(72% 62% at 50% 32%,#000 0%,transparent 78%);
+}
+.hero-grid{position:relative;display:grid;gap:clamp(24px,3.4vw,46px);grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);align-items:center}
+.s1 h1{margin:clamp(10px,1.6vh,18px) 0 0;font-size:clamp(28px,3.5vw,60px);line-height:1.14;font-weight:750;letter-spacing:-.02em}
+.s1 p.lead{margin:clamp(12px,2vh,20px) 0 0;font-size:clamp(14px,1.1vw,16.5px);line-height:1.75;color:var(--ink-2);max-width:33em}
+.hero-actions{display:flex;flex-wrap:wrap;gap:11px;margin-top:clamp(16px,2.4vh,26px);align-items:center}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:12px 21px;border-radius:12px;font-size:14.5px;font-weight:600;border:1px solid transparent;cursor:pointer;transition:transform .22s var(--ease),box-shadow .22s var(--ease),background .2s,border-color .2s}
+.btn-p{background:var(--blue);color:#fff;box-shadow:0 16px 32px -16px rgba(26,99,244,.95)}
+.btn-p:hover{transform:translateY(-2px);background:var(--blue-d)}
+.btn-g{background:#fff;color:var(--ink);border-color:var(--line);box-shadow:var(--shadow-s)}
+.btn-g:hover{transform:translateY(-2px);border-color:#bcd2f7}
+.btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hero-meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:clamp(12px,1.8vh,18px);font-size:12.5px;color:var(--muted)}
+.hero-meta span{display:inline-flex;align-items:center;gap:6px}
+.hero-meta svg{width:13px;height:13px;fill:none;stroke:var(--blue);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* ================= 显示器框 ================= */
+.screen{position:relative;border-radius:16px;background:#fff;border:1px solid var(--line);box-shadow:0 40px 80px -46px rgba(16,48,120,.55),0 0 0 6px rgba(255,255,255,.7),0 0 0 7px var(--line);overflow:hidden}
+.screen-bar{height:30px;display:flex;align-items:center;gap:7px;padding:0 11px;background:linear-gradient(#fbfdff,#f1f6ff);border-bottom:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:#dbe6fb}
+.dot.r{background:#ffb3ae}.dot.y{background:#ffd88a}.dot.g{background:#9fe3b1}
+.screen-bar .t{margin-left:5px;font-size:11px;color:var(--muted)}
+.stage{position:relative;aspect-ratio:16/10.6;background:linear-gradient(160deg,#dfeaff,#cadcfb 55%,#b9d0f7);overflow:hidden}
+.stage::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(rgba(26,99,244,.16) 1px,transparent 1px);background-size:18px 18px}
+.taskbar{position:absolute;left:0;right:0;bottom:0;height:11%;display:flex;align-items:center;gap:7px;padding:0 10px;background:rgba(255,255,255,.72);border-top:1px solid rgba(255,255,255,.9);backdrop-filter:blur(6px)}
+.taskbar i{width:13px;height:13px;border-radius:4px;background:#c9d9f5;display:block}
+.taskbar i.blue{background:linear-gradient(140deg,#5b93ff,#1a63f4)}
+.taskbar .clock{margin-left:auto;font-size:8px;color:#5d729b}
+
+.sim{position:absolute;inset:0;overflow:hidden}
+.desk{position:absolute;inset:0}
+.file{position:absolute;left:3.5%;top:17%;width:74px;text-align:center;font-size:10px;color:#243a63;transition:transform .3s var(--ease),opacity .3s}
+.file .fico{width:50px;height:58px;margin:0 auto 5px;border-radius:8px;background:#fff;border:1px solid rgba(255,255,255,.9);box-shadow:0 10px 20px -12px rgba(16,48,120,.55);position:relative}
+.file .fico::before{content:"";position:absolute;inset:7px 7px auto 7px;height:20px;border-radius:3px;background:linear-gradient(135deg,#ff9a76,#f26a4b)}
+.file .fico::after{content:"";position:absolute;left:7px;right:7px;bottom:8px;height:3.5px;border-radius:2px;background:#e2eaf9;box-shadow:0 -7px 0 #e2eaf9}
+.file.hi{transform:scale(1.08)}
+.ppt{
+  position:absolute;left:17%;top:8%;right:4%;bottom:14%;border-radius:9px;background:#fff;border:1px solid #fff;
+  box-shadow:0 30px 50px -26px rgba(16,48,120,.55);transform-origin:14% 30%;opacity:0;transform:scale(.9);
+  pointer-events:none;transition:opacity .38s var(--ease),transform .38s var(--ease);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.sim[data-step="1"] .ppt,.sim[data-step="2"] .ppt,.sim[data-step="3"] .ppt,.sim[data-step="4"] .ppt{opacity:1;transform:scale(1)}
+.ppt-top{height:21px;display:flex;align-items:center;gap:6px;padding:0 9px;font-size:9px;color:#5d729b;background:#f4f8ff;border-bottom:1px solid #e4ecfa}
+.ppt-body{flex:1;padding:9px 11px 10px;display:grid;grid-template-columns:1fr 1fr;gap:7px;align-content:start}
+.ttl{grid-column:1/-1;height:9px;border-radius:4px;background:#dce7fb;width:52%}
+.blk{border-radius:6px;min-height:42px;position:relative;overflow:hidden;background:#f2f6ff;border:1px dashed #c6d8f8;transition:border-color .4s,background .4s}
+.blk::after{
+  content:"";position:absolute;inset:0;opacity:0;transition:opacity .45s var(--ease);
+  background:linear-gradient(90deg,#cfe0ff 0 46%,transparent 46%) 10px 11px/52% 7px no-repeat,linear-gradient(90deg,#dbe7fd 0 78%,transparent 78%) 10px 24px/64% 5px no-repeat;
+}
+.blk.big{grid-column:1/-1;min-height:52px}
+.blk.big::after{
+  background:linear-gradient(90deg,#cfe0ff 0 32%,transparent 32%) 10px 11px/40% 7px no-repeat,
+    linear-gradient(0deg,#bcd5fb,#bcd5fb) 10px 50px/6px 34px no-repeat,
+    linear-gradient(0deg,#bcd5fb,#bcd5fb) 22px 50px/6px 22px no-repeat,
+    linear-gradient(0deg,#bcd5fb,#bcd5fb) 34px 50px/6px 29px no-repeat,
+    linear-gradient(0deg,#bcd5fb,#bcd5fb) 46px 50px/6px 15px no-repeat;
+}
+.blk.bad::before{content:"无法显示";position:absolute;inset:0;display:grid;place-items:center;font-size:9.5px;color:#d94848;letter-spacing:.04em;transition:opacity .4s var(--ease);opacity:1}
+.blk.bad{border-style:dashed;border-color:#f0b3b3;background:#fff6f6}
+.sim.fixed .blk.bad::before{opacity:0}
+.sim.fixed .blk.bad{border:1px solid transparent;background:#f2f6ff}
+.sim.fixed .blk::after{opacity:1}
+.blk.sm{min-height:22px;background:#eef4ff;border:1px solid #e2ecfb;border-radius:5px}
+.blk.sm::after{display:none}
+
+.toast{
+  position:absolute;right:5%;bottom:6%;width:74%;max-width:270px;background:#fff;border:1px solid var(--line);
+  border-radius:11px;box-shadow:0 22px 40px -26px rgba(16,48,120,.62);padding:10px 11px;display:flex;gap:9px;align-items:flex-start;
+  opacity:0;transform:translateY(14px) scale(.97);transition:opacity .4s var(--ease),transform .4s var(--ease);
+}
+.sim[data-step="2"] .toast,.sim[data-step="3"] .toast{opacity:1;transform:none}
+.toast .ti{width:22px;height:22px;flex:0 0 22px;border-radius:50%;display:grid;place-items:center;background:#fff1ef;color:#e2583f;font-size:13px;font-weight:700}
+.toast.fixed .ti{background:#eafaf0;color:#2aa15e}
+.toast .tt{font-size:10.5px;color:var(--ink);line-height:1.45}
+.toast .tt b{display:block;font-size:11px;margin-bottom:2px}
+.toast .tbtn{margin-top:7px;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:#fff;background:var(--blue);border-radius:7px;padding:4px 9px;transition:transform .18s var(--ease),background .2s}
+.sim[data-step="3"] .toast .tbtn{transform:scale(.94);background:var(--blue-d)}
+.toast.fixed .tbtn{display:none}
+.pbar{position:absolute;left:17%;right:4%;bottom:5.2%;height:4px;border-radius:99px;background:#e2ebfb;overflow:hidden;opacity:0;transition:opacity .3s}
+.sim[data-step="3"] .pbar{opacity:1}
+.pbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#4d8bff,#1a63f4);transition:width 1.9s cubic-bezier(.32,.62,.32,1)}
+.sim[data-step="3"] .pbar i{width:100%}
+.sim[data-step="4"] .pbar{opacity:0}
+.done{
+  position:absolute;left:50%;top:3.4%;transform:translate(-50%,-8px);opacity:0;display:flex;align-items:center;gap:7px;
+  padding:6px 12px;border-radius:99px;background:#fff;border:1px solid #c8ead6;color:#1f8f52;font-size:10.5px;font-weight:600;
+  box-shadow:0 14px 26px -18px rgba(16,48,120,.5);transition:opacity .4s var(--ease),transform .4s var(--ease);
+}
+.sim[data-step="4"] .done{opacity:1;transform:translate(-50%,0)}
+.cur{position:absolute;left:50%;top:50%;width:16px;height:22px;z-index:9;transition:left 1s cubic-bezier(.4,.5,.2,1),top 1s cubic-bezier(.4,.5,.2,1),transform .16s;filter:drop-shadow(0 3px 5px rgba(12,36,90,.32))}
+.cur svg{width:100%;height:100%;display:block}
+.sim[data-step="3"] .cur{transform:scale(.86)}
+
+/* ================= 第 2 层 ================= */
+.sec-head{max-width:820px}
+.sec-head h2{margin:clamp(8px,1.4vh,14px) 0 0;font-size:clamp(24px,2.9vw,42px);line-height:1.2;font-weight:740;letter-spacing:-.015em}
+.sec-head p{margin:clamp(8px,1.4vh,13px) 0 0;color:var(--ink-2);font-size:clamp(13px,1vw,15.5px);line-height:1.7}
+.two{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(20px,3.4vw,54px);align-items:center;margin-top:clamp(18px,3vh,38px)}
+.incident{border-radius:16px;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow);overflow:hidden}
+.incident-bar{height:28px;display:flex;align-items:center;gap:6px;padding:0 11px;background:#fbfdff;border-bottom:1px solid var(--line);font-size:10.5px;color:var(--muted)}
+.incident-body{padding:14px;background:linear-gradient(170deg,#fbfdff,#eef4ff)}
+.err-card{border-radius:10px;border:1px solid #f2d3ce;background:#fff8f7;padding:11px 12px;font-size:11px;color:#8a3b2e;box-shadow:0 10px 20px -18px rgba(120,30,20,.6)}
+.err-card b{display:flex;align-items:center;gap:6px;font-size:11.5px;margin-bottom:5px;color:#c0392b}
+.err-card .row{height:6px;border-radius:3px;background:#f7ddd8;margin-top:6px}
+.err-card .row:nth-child(3){width:72%}
+.err-card .row:nth-child(4){width:48%}
+.stuck{margin-top:10px;border-radius:10px;border:1px solid #ffe2b8;background:#fffcf4;padding:10px 12px;font-size:10.5px;color:#8a6114;display:flex;align-items:flex-start;gap:7px;line-height:1.6}
+.stuck .pulse{width:7px;height:7px;border-radius:50%;background:#f0a020;margin-top:4px;flex:0 0 7px;animation:pl 1.6s infinite}
+@keyframes pl{0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,.5)}50%{box-shadow:0 0 0 6px rgba(240,160,32,0)}}
+.caption{margin-top:9px;font-size:11px;color:var(--muted);text-align:center}
+.plist{display:flex;flex-direction:column}
+.pitem{display:flex;gap:clamp(12px,1.5vw,20px);padding:clamp(9px,1.5vh,16px) 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.pitem:first-child{padding-top:0}
+.pitem:last-child{border-bottom:0;padding-bottom:0}
+.pidx{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--blue);padding-top:.4em;min-width:2.1em;font-variant-numeric:tabular-nums;opacity:.85}
+.pitem h3{margin:0;font-size:clamp(15px,1.25vw,17.5px);font-weight:680;letter-spacing:-.01em}
+.pitem p{margin:4px 0 0;font-size:clamp(12.5px,.95vw,14px);line-height:1.62;color:var(--ink-2)}
+
+/* ================= 第 3 层 ================= */
+.s3{background:linear-gradient(180deg,#f6f9ff,#fff 62%)}
+.demo-frame{margin-top:clamp(10px,2vh,20px);border-radius:18px;border:1px solid var(--line);background:linear-gradient(180deg,#fff,#f8fbff);box-shadow:0 46px 90px -60px rgba(16,48,120,.6);padding:clamp(10px,1.4vw,18px)}
+.demo-frame .screen{box-shadow:0 30px 60px -40px rgba(16,48,120,.5),0 0 0 6px rgba(255,255,255,.7),0 0 0 7px var(--line)}
+.demo-frame .stage{aspect-ratio:16/9.6}
+.demo-cols{display:grid;gap:clamp(10px,1.4vw,18px);grid-template-columns:1fr}
+.demo-side{display:flex;flex-direction:column;gap:9px}
+.demo-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.demo-note{font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;line-height:1.5}
+.demo-note .badge{font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-l);border-radius:99px;padding:3px 9px;letter-spacing:.04em}
+.mini-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;transition:transform .2s var(--ease),border-color .2s,box-shadow .2s}
+.mini-btn:hover{transform:translateY(-1px);border-color:#bcd2f7;box-shadow:var(--shadow-s)}
+.mini-btn svg{width:13px;height:13px;fill:none;stroke:var(--blue);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.steps{display:flex;gap:7px;flex-wrap:wrap}
+.step{flex:1 1 0;min-width:92px;border-radius:10px;border:1px solid var(--line);background:#fff;padding:7px 10px;font-size:11.5px;color:var(--muted);transition:all .34s var(--ease);cursor:pointer;text-align:left}
+.step b{display:block;font-size:10px;letter-spacing:.08em;color:#9aabca;font-weight:700;margin-bottom:1px}
+.step.on{background:var(--blue-l);border-color:#b9d1fb;color:var(--blue-d);box-shadow:0 10px 20px -16px rgba(26,99,244,.8)}
+.step.on b{color:var(--blue)}
+
+/* ================= 第 4 层 · 更新报告 ================= */
+.s4{background:linear-gradient(180deg,#fff,#f6f9ff)}
+.log{display:grid;grid-template-columns:1fr 1fr;gap:clamp(7px,1.1vh,11px)}
+.log .row{
+  display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:clamp(9px,1.4vh,14px) clamp(11px,1.2vw,15px);box-shadow:var(--shadow-s);
+  transition:transform .26s var(--ease),border-color .26s;
+}
+.log .row:hover{transform:translateY(-2px);border-color:#bcd2f7}
+.log .row:last-child{grid-column:1/-1;background:linear-gradient(90deg,#f7faff,#fff 62%);border-color:#cddffb}
+.log .row .num{font-size:11px;font-weight:700;color:var(--blue);padding-top:.25em;min-width:1.9em;font-variant-numeric:tabular-nums}
+.log .row .txt{font-size:clamp(11.5px,1.05vw,13.5px);color:var(--ink-2);line-height:1.58}
+.log .row .txt b{color:var(--ink);font-weight:600}
+.log .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.02em;border-radius:5px;padding:1px 6px;margin-right:6px;background:#ffeceb;color:#c0392b;vertical-align:1px}
+.log .tag.g{background:var(--blue-l);color:var(--blue-d)}
+.log .tag.n{background:#eef7f0;color:#1f8f52}
+.lede{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:clamp(8px,1.4vh,13px) 0 0;font-size:12.5px;color:var(--muted)}
+.lede .pill{display:inline-flex;align-items:center;gap:6px;background:var(--blue-l);color:var(--blue-d);border-radius:99px;padding:4px 10px;font-weight:600;font-size:12px}
+.s4 .foot{display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:space-between;margin-top:clamp(10px,1.8vh,18px);font-size:12px;color:var(--muted)}
+.s4 .foot a:hover,.s4 .foot button:hover{color:var(--blue)}
+.s4 .foot button{background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit;text-decoration:underline;text-decoration-style:dashed;text-decoration-color:#d5e0f2;text-underline-offset:3px}
+
+/* ================= 响应式 ================= */
+@media(min-width:861px){
+  .nav-top{display:flex}
+  .nav-bottom .arrow.up{display:none}
+  .demo-cols{grid-template-columns:1.78fr .92fr;align-items:stretch}
+  .demo-side{justify-content:space-between}
+  .steps{flex-direction:column}
+  .step{min-width:0;padding:9px 11px;font-size:12px}
+  .step b{font-size:10px}
+  .mini-btn{align-self:flex-start;margin-top:2px}
+}
+@media(max-width:960px){
+  .hero-grid,.two{grid-template-columns:1fr}
+  .s1 .inner{padding-top:64px}
+  .hero-grid > .up:last-child{order:-1}
+  .log{grid-template-columns:1fr}
+  .log .row:last-child{grid-column:auto}
+  .nav-links a:not(.nav-cta){display:none}
+  .nav-links button{white-space:nowrap}
+  .dots{right:8px;gap:0}
+  .dots button{width:36px;height:36px}
+  .dots button::before{width:7px;height:7px}
+  .dots button.on::before{height:20px}
+}
+@media(max-width:520px){
+  /* 手机端导航只留品牌与下载按钮，三个跳屏按钮收进右侧圆点导航，避免窄屏换行 */
+  .nav-links button{display:none}
+  .s1 h1{font-size:26px}
+  .hero-meta{font-size:11.5px}
+  .btn{padding:11px 16px;font-size:13.5px}
+  .pitem{gap:10px}
+  .demo-note{font-size:11.5px}
+  /* 页脚两段文字并排会互相挤压（品牌全称被截断），窄屏改为各占一整行 */
+  .s4 .foot{flex-direction:column;align-items:flex-start;gap:4px;font-size:11.5px}
+}
+/* ===== 高度自适应：按「屏高」分档收紧排版，矮屏/横屏也能一屏放下或只需少量滚动 ===== */
+@media(max-width:960px) and (max-height:960px){
+  .slide .inner{padding:46px clamp(16px,4.4vw,40px) 68px}
+  .s1 h1{font-size:clamp(20px,4.6vw,26px);margin-top:6px}
+  .s1 p.lead{font-size:13px;line-height:1.6;margin-top:9px}
+  .hero-actions{margin-top:12px}
+  .hero-meta{margin-top:8px;font-size:11px;gap:5px 12px}
+  .hero-grid{gap:12px}
+  .s1 .stage{aspect-ratio:16/8}
+  .sec-head h2{font-size:clamp(19px,3.5vw,26px);margin-top:6px}
+  .sec-head p{font-size:12.5px;margin-top:6px}
+  .two{margin-top:10px;gap:14px}
+  .pitem{padding:6px 0;gap:10px}
+  .pitem h3{font-size:14.5px}
+  .pitem p{font-size:12px;line-height:1.5;margin-top:3px}
+  .demo-frame{padding:9px;margin-top:9px}
+  .demo-frame .stage{aspect-ratio:16/8}
+  .demo-note{font-size:11px}
+  .steps{gap:5px}
+  .step{padding:6px 9px;font-size:11px;min-width:80px}
+  .log{gap:6px}
+  .log .row{padding:8px 10px;border-radius:10px}
+  .log .row .txt{font-size:11.5px;line-height:1.5}
+  .log .row .num{font-size:10px}
+  .lede{margin-top:6px;font-size:11.5px;gap:6px 10px}
+  .lede .pill{font-size:11px;padding:3px 8px}
+  .s4 .foot{margin-top:8px;font-size:11px}
+}
+@media(max-width:960px) and (max-height:770px){
+  .slide .inner{padding:34px clamp(14px,4vw,30px) 60px}
+  .s1 h1{font-size:clamp(18px,4.4vw,23px);line-height:1.16}
+  .two .screen .stage{max-height:26vh}      /* 屏矮时先缩演示图，正文保可读 */
+  .s1 p.lead{font-size:12.5px;line-height:1.54;margin-top:7px}
+  .hero-actions{margin-top:9px;gap:8px}
+  .btn{padding:9px 14px;font-size:12.5px}
+  .hero-meta{margin-top:6px;font-size:10.5px}
+  .s1 .stage{aspect-ratio:16/6.8}
+  .sec-head h2{font-size:clamp(17px,3.2vw,22px);margin-top:4px}
+  .sec-head p{font-size:11.5px;line-height:1.45;margin-top:3px}
+  .two{gap:10px;margin-top:8px}
+  .two > .up{zoom:.8}     /* 演示卡整体等比缩小（不支持的浏览器忽略，只是多滚一点） */
+  .pitem{padding:4px 0;gap:8px}
+  .pitem h3{font-size:13.5px}
+  .pitem p{font-size:11.5px;line-height:1.42;margin-top:2px}
+  .incident-bar{height:24px;font-size:9.5px}
+  .incident-body{padding:10px}
+  .caption{display:none}
+  .demo-frame{padding:7px;margin-top:7px}
+  .demo-frame .stage{aspect-ratio:16/6.6}
+  .steps{gap:4px}
+  .step{padding:5px 7px;font-size:10.5px;min-width:0}
+  .log .row{padding:7px 9px}
+  .log .row .txt{font-size:11px;line-height:1.46}
+  .log .row .num{font-size:9.5px}
+  .log .tag{font-size:9px;padding:1px 5px;margin-right:4px}
+  .lede{font-size:11px;gap:5px 8px}
+  .lede .pill{font-size:10.5px;padding:2px 7px}
+}
+/* 极小屏（320×568 一类老机型）：允许层内滚动，但保证可读、首尾都能滚到 */
+@media(max-width:960px) and (max-height:620px){
+  .slide .inner{padding:32px 12px 62px}
+  .s1 h1{font-size:clamp(17px,4.6vw,21px)}
+  .s1 p.lead{font-size:12px;line-height:1.5;margin-top:6px}
+  .s1 .stage{aspect-ratio:16/6.2}
+  .two .screen .stage{max-height:23vh}
+  .eyebrow{font-size:9.5px}
+  .sec-head h2{font-size:clamp(16px,3.4vw,20px)}
+  .sec-head p{font-size:11px;line-height:1.42;margin-top:3px}
+  .two{gap:8px;margin-top:6px}
+  .two > .up{zoom:.72}
+  .pitem{padding:4px 0;gap:8px}
+  .pitem h3{font-size:13px}
+  .pitem p{font-size:11px;line-height:1.4;margin-top:2px}
+  .incident-bar{height:22px;font-size:9px}
+  .incident-body{padding:8px}
+  .caption{display:none}      /* 极矮屏藏掉演示图下的小字说明，把高度让给四条要点 */
+  .demo-frame{padding:6px;margin-top:6px}
+  .demo-frame .stage{aspect-ratio:16/6.2}
+  .log{gap:5px}
+  .log .row{padding:6px 8px;border-radius:9px}
+  .log .row .txt{font-size:10.5px;line-height:1.44}
+  .log .row .num{font-size:9px}
+  .log .tag{font-size:8.5px;padding:1px 4px;margin-right:3px}
+  .s4 .foot{font-size:10px;margin-top:6px;row-gap:3px}
+}
+/* 手机横屏（高度极窄、宽度充裕）：改回左右分栏，避免上下堆叠把内容顶出屏幕 */
+@media(orientation:landscape) and (max-height:560px){
+  .nav{height:48px}                          /* 横屏高度紧：导航压矮，给内容腾 12px */
+  .slide .inner{padding:52px clamp(20px,3.2vw,34px) 58px}
+  .s1 h1{font-size:clamp(18px,2.3vw,25px)}
+  .s1 p.lead{font-size:12px;line-height:1.5;margin-top:7px;max-width:44em}
+  .s1 .stage{aspect-ratio:16/9.2}
+  .two .screen .stage{aspect-ratio:auto;height:min(42vh,220px)}
+  .demo-frame .stage{aspect-ratio:auto;height:min(46vh,230px)}
+  .hero-grid{grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:clamp(14px,2.4vw,26px);align-items:center}
+  .hero-grid > .up:last-child{order:0}      /* 横屏截图回到右侧，不再压到标题上方 */
+  .hero-actions{margin-top:9px}
+  .btn{padding:9px 15px;font-size:13px}
+  .hero-meta{margin-top:6px;font-size:10.5px}
+  .sec-head{max-width:none}
+  .sec-head h2{font-size:clamp(18px,2.2vw,25px)}
+  .sec-head p{display:none}      /* 横屏高度极紧，省掉这一行导语 */
+  .two{grid-template-columns:1.06fr .94fr;align-items:center;gap:clamp(14px,2.2vw,24px);margin-top:10px}
+  .two > .up{zoom:.86}
+  .plist{gap:0}
+  .pitem{padding:6px 0;gap:9px}
+  .pitem p{font-size:11.5px;line-height:1.46}
+  .demo-cols{grid-template-columns:1.62fr .88fr;align-items:stretch}
+  .demo-side{justify-content:space-between}
+  .demo-frame{padding:8px;margin-top:8px}
+  .log{grid-template-columns:1fr 1fr}
+  .log .row:last-child{grid-column:auto}
+  .log .row{padding:7px 9px}
+  .log .row .txt{font-size:10.5px;line-height:1.44}
+  .log .row .num{font-size:9.5px}
+  .log .tag{font-size:9px;padding:1px 5px;margin-right:4px}
+  .lede{margin-top:5px;font-size:10.5px;gap:5px 8px}
+  .lede .pill{font-size:10px;padding:2px 7px}
+  .s4 .foot{margin-top:6px;font-size:10.5px}
+}
+/* 窄屏（375~420）× 矮屏：更新记录改双栏，避免 7 条平铺把页面拉长一倍
+   320/360 一类太窄的屏不套用（双栏会挤成豆腐块，宁可单列滚动） */
+@media(min-width:375px) and (max-width:420px) and (max-height:760px){
+  .log{grid-template-columns:1fr 1fr;gap:5px}
+  .log .row{padding:6px 7px;gap:6px;border-radius:9px}
+  .log .row:last-child{grid-column:1/-1}
+  .log .row .num{font-size:9px;min-width:1.5em;padding-top:.2em}
+  .log .row .txt{font-size:10px;line-height:1.42}
+  .log .tag{font-size:8.5px;padding:1px 4px;margin-right:3px}
+}
+/* 横屏但宽度不足（667×375 一类）：两列会把每条挤成豆腐块，回退单列 */
+@media(orientation:landscape) and (max-height:560px) and (max-width:760px){
+  .plist{display:flex;flex-direction:column;gap:0}
+  .pitem{padding:4px 0;gap:8px}
+  .pitem p{font-size:11px;line-height:1.4}
+  .two > .up{zoom:.8}
+}
+@media(prefers-reduced-motion:reduce){
+  .line>span,.up,.ul::after{transition:none !important}
+  .line>span{transform:none}
+  .up{opacity:1;transform:none}
+  .ul::after{transform:scaleX(1)}
+  .arrow{animation:none}
+  .cur{transition:none}
+}
+</style>
+</head>
+<body class="on-s1">
+
+<header class="nav" id="nav">
+  <button type="button" class="brand" data-go="0">
+    <i><svg viewBox="0 0 24 24"><path d="M4 13l5 5L20 6"/></svg></i>
+    ClassFix
+  </button>
+  <nav class="nav-links">
+    <button type="button" data-go="1">它做什么</button>
+    <button type="button" data-go="2">使用动画</button>
+    <button type="button" data-go="3">更新报告</button>
+    <a href="https://aiclass.openplays.cn/classfix/ClassFix-1.6.3-Windows-x64.zip" download="ClassFix-1.6.3-Windows-x64.zip" class="nav-cta">下载 v1.6.3</a>
+  </nav>
+</header>
+
+<div class="deck" id="deck">
+
+  <!-- ============ 1 · 主展示 ============ -->
+  <section class="slide s1" id="s1">
+    <div class="inner">
+      <div class="wrap hero-grid">
+        <div id="heroText">
+          <div class="up" style="--d:0s"><span class="eyebrow"><b></b>INSTALL · RUN · FORGET</span></div>
+          <h1>
+            <span class="line" style="--d:.06s"><span>课堂上，PPT 不该</span></span>
+            <span class="line" style="--d:.16s"><span>在<span class="ul" style="--du:.72s">最后一秒</span>才出错</span></span>
+          </h1>
+          <p class="lead up" style="--d:.3s">ClassFix 常驻教室电脑，在 PowerPoint 打开之前就把会导致报错、白屏、提示不消失的问题拦下来。老师看见的只是「打开就能用」，看不见它在后台做了什么。</p>
+          <div class="hero-actions up" style="--d:.4s">
+            <a class="btn btn-p" href="https://aiclass.openplays.cn/classfix/ClassFix-1.6.3-Windows-x64.zip" download="ClassFix-1.6.3-Windows-x64.zip">
+              <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19h16"/></svg>
+              下载 v1.6.3 · Windows（68.6 MB）
+            </a>
+            <button type="button" class="btn btn-g" data-go="2">
+              <svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>
+              看它怎么工作
+            </button>
+          </div>
+          <div class="hero-meta up" style="--d:.5s">
+            <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>免管理员权限</span>
+            <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>离线优先，云端可选</span>
+            <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>一键还原</span>
+          </div>
+        </div>
+
+        <div class="up" style="--d:.24s">
+          <div class="screen">
+            <div class="screen-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="t" id="barTitle">教师机 · PowerPoint 正在打开</span>
+            </div>
+            <div class="stage">
+              <div class="sim" id="sim1" data-step="0">
+                <div class="desk">
+                  <div class="taskbar"><i class="blue"></i><i></i><i></i><i></i><span class="clock">08:24</span></div>
+                  <div class="file" id="file1"><div class="fico"></div>期中复习.pptx</div>
+                  <div class="ppt">
+                    <div class="ppt-top"><span class="dot r" style="width:6px;height:6px"></span><span class="dot y" style="width:6px;height:6px"></span><span>期中复习.pptx — PowerPoint</span></div>
+                    <div class="ppt-body">
+                      <div class="ttl"></div>
+                      <div class="blk big bad"></div>
+                      <div class="blk bad"></div>
+                      <div class="blk bad"></div>
+                      <div class="blk sm"></div>
+                      <div class="blk sm"></div>
+                    </div>
+                  </div>
+                  <div class="toast">
+                    <div class="ti">!</div>
+                    <div class="tt"><b>检测到 3 个对象无法正确显示</b>幻灯片可能显示为空白或报错。<span class="tbtn">一键修复</span></div>
+                  </div>
+                  <div class="pbar"><i></i></div>
+                  <div class="done"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#1f8f52" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>已修复 3 处 · 提示已关闭</div>
+                  <div class="cur"><svg viewBox="0 0 16 22"><path d="M1 1l12 9-5.2.9L10 20 7.4 21 4.6 11.8 1 15z" fill="#fff" stroke="#0f1e3d" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-bottom">
+      <button class="arrow down" data-go="next" aria-label="下一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 2 · 它做什么 ============ -->
+  <section class="slide s2" id="s2">
+    <div class="nav-top">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="inner">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="up"><span class="eyebrow"><b></b>WHAT IT DOES</span></div>
+          <h2>
+            <span class="line" style="--d:.06s"><span>它只做<span class="ul" style="--du:.6s">四件事</span>，</span></span>
+            <span class="line" style="--d:.16s"><span>每件都冲着课堂里的真问题</span></span>
+          </h2>
+          <p class="up" style="--d:.26s">不优化系统、不清理垃圾、不改你的电脑习惯。它只盯着那几类每学期都会让课卡住的故障。</p>
+        </div>
+
+        <div class="two">
+          <div class="up" style="--d:.08s">
+            <div class="incident">
+              <div class="incident-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span style="margin-left:5px">PowerPoint · 无法打开文件</span></div>
+              <div class="incident-body">
+                <div class="err-card">
+                  <b>⚠ PowerPoint 发现内容有问题</b>
+                  PowerPoint 无法读取 xxx 中的部分内容，是否恢复此演示文稿？
+                  <div class="row"></div><div class="row"></div><div class="row"></div>
+                </div>
+                <div class="stuck"><span class="pulse"></span><span>右下角「正在修复…」的提示已经挂了 6 分钟，鼠标点不掉 —— 下一节课要用。</span></div>
+              </div>
+            </div>
+            <div class="caption">这些就是它要提前拦掉的现场</div>
+          </div>
+
+          <div class="plist">
+            <div class="pitem up" style="--d:.06s"><span class="pidx">01</span><div><h3>打开就自检</h3><p>启动前先扫加载项、字体、图形驱动与代理设置，连投影模式和放映接口都实测一遍，把「打开就报错」的成因在打开之前找出来。</p></div></div>
+            <div class="pitem up" style="--d:.16s"><span class="pidx">02</span><div><h3>出错先拦下</h3><p>命中已知异常时改走安全路径，幻灯片不白屏、不弹「内容有问题」，也不会把坏状态写回文件。</p></div></div>
+            <div class="pitem up" style="--d:.26s"><span class="pidx">03</span><div><h3>提示一定消失</h3><p>每一条提示都记来源、记归属窗口，修完主动关掉，不留「已修复」的残影挂在屏幕右下角。</p></div></div>
+            <div class="pitem up" style="--d:.36s"><span class="pidx">04</span><div><h3>全程可回退</h3><p>每次改动前自动备份注册表与配置，一键还原到动手之前 —— 装错了也不至于把电脑弄坏。</p></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-bottom">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+      <button class="arrow down" data-go="next" aria-label="下一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 3 · 内置使用动画 ============ -->
+  <section class="slide s3" id="s3">
+    <div class="nav-top">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="inner">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="up"><span class="eyebrow"><b></b>IN USE</span></div>
+          <h2>
+            <span class="line" style="--d:.06s"><span>十二秒，看它在教室里</span></span>
+            <span class="line" style="--d:.16s"><span>怎么<span class="ul" style="--du:.6s">自己动手</span></span></span>
+          </h2>
+          <p class="up" style="--d:.26s">自动播放的真实流程：老师双击课件，ClassFix 在旁边判断、修复、收尾，全程不需要老师做任何事。也可以点下面四步直接看某一阶段。</p>
+        </div>
+
+        <div class="demo-frame up" style="--d:.1s">
+          <div class="demo-cols">
+          <div class="screen">
+            <div class="screen-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span class="t" id="barTitle2">教师机 · 上课前 2 分钟</span>
+            </div>
+            <div class="stage">
+              <div class="sim" id="sim2" data-step="0">
+                <div class="desk">
+                  <div class="taskbar"><i class="blue"></i><i></i><i></i><i></i><span class="clock">08:24</span></div>
+                  <div class="file" id="file2"><div class="fico"></div>期中复习.pptx</div>
+                  <div class="ppt">
+                    <div class="ppt-top"><span class="dot r" style="width:6px;height:6px"></span><span class="dot y" style="width:6px;height:6px"></span><span>期中复习.pptx — PowerPoint</span></div>
+                    <div class="ppt-body">
+                      <div class="ttl"></div>
+                      <div class="blk big bad"></div>
+                      <div class="blk bad"></div>
+                      <div class="blk bad"></div>
+                      <div class="blk sm"></div>
+                      <div class="blk sm"></div>
+                    </div>
+                  </div>
+                  <div class="toast">
+                    <div class="ti">!</div>
+                    <div class="tt"><b>检测到 3 个对象无法正确显示</b>幻灯片可能显示为空白或报错。<span class="tbtn">一键修复</span></div>
+                  </div>
+                  <div class="pbar"><i></i></div>
+                  <div class="done"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#1f8f52" stroke-width="3" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>已修复 3 处 · 提示已关闭</div>
+                  <div class="cur"><svg viewBox="0 0 16 22"><path d="M1 1l12 9-5.2.9L10 20 7.4 21 4.6 11.8 1 15z" fill="#fff" stroke="#0f1e3d" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="demo-side">
+            <div class="demo-note"><span class="badge">自动循环</span><span id="demoCaption">老师双击课件，ClassFix 在旁边先看了一遍</span></div>
+            <div class="steps" id="steps">
+              <button class="step on" data-s="0"><b>STEP 01</b>双击课件</button>
+              <button class="step" data-s="1"><b>STEP 02</b>静默检测</button>
+              <button class="step" data-s="2"><b>STEP 03</b>自动修复</button>
+              <button class="step" data-s="3"><b>STEP 04</b>干净收尾</button>
+            </div>
+            <button class="mini-btn" id="replay"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.4 5.7M20 5v6h-6"/></svg>重新播放</button>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-bottom">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+      <button class="arrow down" data-go="next" aria-label="下一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ 4 · 更新报告 ============ -->
+  <section class="slide s4" id="s4">
+    <div class="nav-top">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="inner">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="up"><span class="eyebrow"><b></b>RELEASE NOTES</span></div>
+          <h2>
+            <span class="line" style="--d:.06s"><span>v1.6.3 更新报告</span></span>
+            <span class="line" style="--d:.16s"><span>七路证据<span class="ul" style="--du:.6s">一起收上来</span></span></span>
+          </h2>
+          <div class="lede up" style="--d:.28s">
+            <span class="pill">3 项诊断新能力</span>
+            <span class="pill">2 项修复</span>
+            <span class="pill">内存可一键优化</span>
+            <span>基准 1.5.0 · 累计 6 条</span>
+          </div>
+        </div>
+
+        <div class="log" style="margin-top:clamp(12px,2.2vh,24px)">
+          <div class="row up" style="--d:.04s"><span class="num">01</span><div class="txt"><span class="tag g">新增</span><b>放映出问题，自动给一份分层诊断</b>视频一黑屏，过去只有一句「播放异常」。现在一次收齐七路证据再下结论：课件里视频是嵌入还是外链、引用还在不在；故障当刻系统音量与静音状态；出问题的是第几页哪个课件；PowerPoint 自己弹的报错原文；读取播放器状态时 COM 接口有没有报错；故障前后 10 秒内 PowerPoint 进程有没有崩溃或无响应；以及在故障窗口里抓的一小段进程过滤追踪样本。每条都标「已确认 / 未取得」。</div></div>
+          <div class="row up" style="--d:.09s"><span class="num">02</span><div class="txt"><span class="tag g">新增</span><b>提示里直接写 PowerPoint 的报错原文</b>右下角提示会写清第几页、检测依据是什么，并把 PowerPoint 弹出的报错原文附在后面。读不到就明说「未读取到」，不编原因。</div></div>
+          <div class="row up" style="--d:.14s"><span class="num">03</span><div class="txt"><span class="tag g">新增</span><b>内存紧张时提醒，并可一键优化</b>放映期间内存吃紧会提示当前占用率，可一键优化（工作集、文件缓存、已修改页、待机页、低优先级待机页、注册表整理、物理页合并），也能「1 小时内不再提醒」或直接开任务管理器。优化在短命独立进程里跑，做完即退。</div></div>
+          <div class="row up" style="--d:.19s"><span class="num">04</span><div class="txt"><span class="tag">修复</span><b>多个提示不再互相遮挡</b>音量弹窗与扫描告警同时出现时原来会互相盖掉。现在按屏幕位置排队、动画不重叠；音量滑条只在你拖完之后才自动收起。</div></div>
+          <div class="row up" style="--d:.24s"><span class="num">05</span><div class="txt"><span class="tag">修复</span><b>打开验证只关自己那份副本</b>检查结束只关它自己打开的临时副本，PowerPoint 里其它正在用的课件和你的提示偏好都保持原样。</div></div>
+          <div class="row up" style="--d:.29s"><span class="num">06</span><div class="txt"><span class="tag">上一版</span><b>v1.5.0</b>「打开验证」真的用 PowerPoint 打开一次并报页数与失败原因；安全模式对比；读事件日志与 WER 的崩溃记录；只装 WPS 不再白等 25 秒；修托盘监视开关、补 pywin32。</div></div>
+        </div>
+        <div class="foot up" style="--d:.4s">
+          <span>ClassFix v1.6.3 · Classroom Troubleshooting Assistant</span>
+          <span><a href="https://aiclass.openplays.cn/classfix/">
+            正式页面与下载</a> · <button type="button" class="footlink" data-go="0">回到首屏</button></span>
+        </div>
+      </div>
+    </div>
+    <div class="nav-bottom">
+      <button class="arrow up" data-go="prev" aria-label="上一屏">
+        <svg viewBox="0 0 24 24"><path d="M12 19V5m0 0 6 6m-6-6-6 6"/></svg>
+      </button>
+      <button class="arrow down" data-go="top" aria-label="回到首屏">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></svg>
+      </button>
+    </div>
+  </section>
+
+</div>
+
+<div class="dots" id="dots">
+  <button data-go="0" title="主展示" aria-label="第 1 屏"></button>
+  <button data-go="1" title="它做什么" aria-label="第 2 屏"></button>
+  <button data-go="2" title="使用动画" aria-label="第 3 屏"></button>
+  <button data-go="3" title="更新报告" aria-label="第 4 屏"></button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- 触控设备判定 ----------
+     coarse pointer 直接认定；混合设备（触屏笔记本）一旦真的用触摸也切过来。
+     触控模式下改用「原生滚动 + 软吸附」，桌面保留轻滚/键盘切层。 */
+  var touchMode = !!(window.matchMedia && window.matchMedia("(pointer:coarse)").matches);
+  function useTouchMode(){
+    if (touchMode) return;
+    touchMode = true;
+    document.body.classList.add("touch-mode");
+    var h = window.innerHeight || 0;
+    if (h > 0) document.documentElement.style.setProperty("--vh", h + "px");
+  }
+  if (touchMode) document.body.classList.add("touch-mode");
+  window.addEventListener("touchstart", useTouchMode, {passive:true, once:true});
+
+  /* ---------- 视口高度 ---------- */
+  function setVH(){
+    /* 触控模式取 innerHeight：visualViewport.height 会随地址栏/键盘伸缩，
+       层高跟着变会让吸附点漂移，正是「滑到一半突然跳一下」的来源 */
+    var h = touchMode
+      ? Math.round(window.innerHeight || 0)
+      : Math.round((window.visualViewport && window.visualViewport.height) || window.innerHeight || 0);
+    if (h > 0) document.documentElement.style.setProperty("--vh", h + "px");
+  }
+  setVH();
+  /* 旋转屏幕 / 地址栏伸缩后重新对齐（支持 100dvh 的浏览器走 CSS，不至于跳） */
+  var vhRaf = null;
+  function vhSoon(){ if (vhRaf) return; vhRaf = requestAnimationFrame(function(){ vhRaf = null; setVH(); }); }
+  window.addEventListener("resize", vhSoon);
+  window.addEventListener("orientationchange", function(){ setVH(); setTimeout(setVH, 80); setTimeout(setVH, 350); });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", vhSoon);
+
+  var slides = [].slice.call(document.querySelectorAll(".slide"));
+  var dots = [].slice.call(document.querySelectorAll("#dots button"));
+  var dotsBox = document.getElementById("dots");
+  var idx = 0, lock = 0;
+
+  function clamp(n){ return Math.max(0, Math.min(slides.length - 1, n)); }
+  function innerOf(i){ return slides[i].querySelector(".inner"); }
+
+  /* ---------- 层内边界 ---------- */
+  var EDGE = 8;
+  function edgeState(i){
+    if (touchMode){
+      /* 触控模式没有层内独立滚动：层的剩余内容由页面主轴承载 */
+      var s = slides[i], vh = window.innerHeight || 1, y = window.scrollY || 0;
+      var top = s.offsetTop, h = s.offsetHeight;
+      var scrollable = h - vh > 24;
+      return {
+        scrollable: scrollable,
+        atTop: !scrollable || y <= top + EDGE,
+        atBottom: !scrollable || y + vh >= top + h - EDGE,
+        inner: null
+      };
+    }
+    var inner = innerOf(i);
+    if (!inner) return {scrollable:false, atTop:true, atBottom:true, inner:null};
+    var scrollable = inner.scrollHeight - inner.clientHeight > 6;
+    return {
+      scrollable: scrollable,
+      atTop: !scrollable || inner.scrollTop <= EDGE,
+      atBottom: !scrollable || inner.scrollTop + inner.clientHeight >= inner.scrollHeight - EDGE,
+      inner: inner
+    };
+  }
+
+  /* ---------- 箭头随边界淡出 ---------- */
+  function syncArrows(){
+    var slide = slides[idx], st = edgeState(idx);
+    [].slice.call(slide.querySelectorAll(".arrow")).forEach(function(a){
+      var dir = a.getAttribute("data-go"), idle = false;
+      if (dir === "prev") idle = !st.atTop;
+      else if (dir === "next" || dir === "top") idle = !st.atBottom;
+      a.classList.toggle("idle", idle);
+    });
+  }
+
+  /* ---------- 渐进文字：进入本层时重播 ---------- */
+  function playReveal(i){
+    var slide = slides[i];
+    var els = [].slice.call(slide.querySelectorAll(".up, .line"));
+    els.forEach(function(el){ el.classList.remove("in"); });
+    void slide.offsetWidth;                       /* 强制回流，保证过渡重新开始 */
+    els.forEach(function(el){ el.classList.add("in"); });
+  }
+
+  /* ---------- 内置使用动画 ---------- */
+  var CAPTIONS = [
+    "老师双击课件，ClassFix 在旁边先看了一遍",
+    "发现 3 个对象会显示异常 —— 此时还没打开，来得及",
+    "自动改走安全路径，不需要老师点任何按钮",
+    "重新渲染正常，提示自动关闭，屏幕右下角干净了"
+  ];
+  var BARS = ["教师机 · PowerPoint 正在打开","教师机 · 已拦截 3 处显示异常","教师机 · 正在安全渲染","教师机 · 一切正常"];
+  var CURSOR = [{l:"13%",t:"31%"},{l:"57%",t:"63%"},{l:"62%",t:"70%"},{l:"88%",t:"16%"}];
+
+  var sims = [
+    {sim: document.getElementById("sim1"), file: document.getElementById("file1"), bar: document.getElementById("barTitle"), caption:null, steps:null},
+    {sim: document.getElementById("sim2"), file: document.getElementById("file2"), bar: document.getElementById("barTitle2"), caption:document.getElementById("demoCaption"), steps:document.getElementById("steps")}
+  ];
+
+  function clearTimers(inst){
+    if (inst && inst.timers){ inst.timers.forEach(clearTimeout); inst.timers = []; }
+    if (inst) inst.running = false;
+  }
+
+  function markStep(inst, i){
+    if (inst.caption) inst.caption.textContent = CAPTIONS[i];
+    if (inst.steps){
+      [].slice.call(inst.steps.children).forEach(function(b,k){ b.classList.toggle("on", k === i); });
+    }
+  }
+
+  function run(inst){
+    if (!inst || !inst.sim) return;
+    clearTimers(inst);
+    inst.running = true;
+    inst.timers = [];
+    function at(ms, fn){ inst.timers.push(setTimeout(fn, ms)); }
+
+    inst.sim.setAttribute("data-step","0");
+    inst.sim.classList.remove("fixed");
+    var t0 = inst.sim.querySelector(".toast"); if (t0) t0.classList.remove("fixed");
+    if (inst.file) inst.file.classList.remove("hi");
+    if (inst.bar) inst.bar.textContent = BARS[0];
+    markStep(inst, 0);
+    var c0 = inst.sim.querySelector(".cur"); if (c0){ c0.style.left = CURSOR[0].l; c0.style.top = CURSOR[0].t; }
+
+    at(400,  function(){ if (inst.file) inst.file.classList.add("hi"); });
+    at(1000, function(){ inst.sim.setAttribute("data-step","1"); if (inst.bar) inst.bar.textContent = BARS[1]; });
+    at(1500, function(){ markStep(inst, 1); });
+    at(2300, function(){
+      inst.sim.setAttribute("data-step","2"); if (inst.bar) inst.bar.textContent = BARS[1];
+      var c = inst.sim.querySelector(".cur"); if (c){ c.style.left = CURSOR[1].l; c.style.top = CURSOR[1].t; }
+      markStep(inst, 1);
+    });
+    at(2600, function(){ markStep(inst, 2); });
+    at(3600, function(){
+      inst.sim.setAttribute("data-step","3"); if (inst.bar) inst.bar.textContent = BARS[2];
+      var c = inst.sim.querySelector(".cur"); if (c){ c.style.left = CURSOR[2].l; c.style.top = CURSOR[2].t; }
+      markStep(inst, 2);
+    });
+    at(4100, function(){ markStep(inst, 3); });
+    at(5700, function(){
+      inst.sim.setAttribute("data-step","4"); inst.sim.classList.add("fixed");
+      if (inst.bar) inst.bar.textContent = BARS[3];
+      var t = inst.sim.querySelector(".toast"); if (t) t.classList.add("fixed");
+      var c = inst.sim.querySelector(".cur"); if (c){ c.style.left = CURSOR[3].l; c.style.top = CURSOR[3].t; }
+      markStep(inst, 3);
+    });
+    at(9200, function(){ run(inst); });
+  }
+
+  function jump(inst, k){
+    if (!inst || !inst.sim) return;
+    clearTimers(inst);
+    inst.timers = [];
+    inst.sim.setAttribute("data-step", String(k));
+    inst.sim.classList.toggle("fixed", k >= 3);
+    var t = inst.sim.querySelector(".toast"); if (t) t.classList.toggle("fixed", k >= 3);
+    var c = inst.sim.querySelector(".cur"); if (c){ c.style.left = CURSOR[k].l; c.style.top = CURSOR[k].t; }
+    if (inst.bar) inst.bar.textContent = BARS[k];
+    if (inst.file) inst.file.classList.toggle("hi", k === 0);
+    markStep(inst, k);
+    inst.timers.push(setTimeout(function(){ run(inst); }, 2800));
+  }
+
+  /* 演示动画只在自己那一层播放：由当前层驱动，带 180ms 防抖（避免滚动抖动反复重启） */
+  function startSimFor(i){
+    if (reduce){
+      var inst = sims[i === 2 ? 1 : 0];
+      if (!inst || !inst.sim) return;
+      inst.sim.setAttribute("data-step","4"); inst.sim.classList.add("fixed");
+      var t = inst.sim.querySelector(".toast"); if (t) t.classList.add("fixed");
+      if (inst.bar) inst.bar.textContent = BARS[3];
+      var c = inst.sim.querySelector(".cur"); if (c){ c.style.left = CURSOR[3].l; c.style.top = CURSOR[3].t; }
+      markStep(inst, 3);
+      return;
+    }
+    if (i === 0) run(sims[0]);
+    if (i === 2) run(sims[1]);
+  }
+
+  var simT = null;
+  function syncSim(){
+    clearTimeout(simT);
+    simT = setTimeout(function(){
+      if (idx === 0 && !sims[0].running) startSimFor(0);
+      if (idx !== 0 && sims[0].running) clearTimers(sims[0]);
+      if (idx === 2 && !sims[1].running) startSimFor(2);
+      if (idx !== 2 && sims[1].running) clearTimers(sims[1]);
+    }, 180);
+  }
+
+  if (sims[1].steps){
+    [].slice.call(sims[1].steps.children).forEach(function(btn){
+      btn.addEventListener("click", function(){ jump(sims[1], Number(btn.getAttribute("data-s"))); });
+    });
+  }
+  var replay = document.getElementById("replay");
+  if (replay) replay.addEventListener("click", function(){ run(sims[1]); });
+
+  /* ---------- 切层 ---------- */
+  function paint(){
+    slides.forEach(function(s,i){ s.classList.toggle("on", i === idx); });
+    dots.forEach(function(d,i){
+      d.classList.toggle("on", i === idx);
+      if (i === idx) d.setAttribute("aria-current", "true");
+      else d.removeAttribute("aria-current");
+    });
+    dotsBox.classList.toggle("on", true);
+    document.body.classList.toggle("on-s1", idx === 0);
+    syncSim();
+  }
+
+  function go(n, instant){
+    n = clamp(n);
+    if (n === idx) return;
+    markActed();
+    idx = n;
+    paint();
+    var target = innerOf(n);
+    if (target) target.scrollTop = 0;
+    syncArrows();
+    lock = Date.now() + 780;
+    var top = slides[n].offsetTop;
+    if (instant || reduce) window.scrollTo(0, top);
+    else {
+      window.scrollTo(0, window.scrollY || 0);    /* 先掐断触摸/触控板惯性，否则 smooth 会被惯性顶掉停在半路 */
+      window.scrollTo({top: top, behavior:"smooth"});
+    }
+    playReveal(n);
+  }
+
+  function markActed(){
+    if (!document.body.classList.contains("no-bob")) document.body.classList.add("no-bob");
+  }
+
+  /* ---------- 点击箭头 / 圆点 / 导航 ---------- */
+  document.addEventListener("click", function(e){
+    var t = e.target.closest ? e.target.closest("[data-go]") : null;
+    if (!t) return;
+    var v = t.getAttribute("data-go");
+    e.preventDefault();
+    if (v === "next") go(idx + 1);
+    else if (v === "prev") go(idx - 1);
+    else if (v === "top") go(0);
+    else go(parseInt(v, 10) || 0);
+  });
+
+  /* ---------- 滚轮：轻滚动即切层（仅桌面） ---------- */
+  var acc = 0, lastWheel = 0;
+  window.addEventListener("wheel", function(e){
+    if (touchMode) return;                        /* 触控模式一律交给原生滚动 */
+    if (e.ctrlKey) return;
+    markActed();
+    var st = edgeState(idx);
+    if (st.scrollable){
+      if (!((e.deltaY < 0 && st.atTop) || (e.deltaY > 0 && st.atBottom))){
+        syncArrows();
+        return;                                   /* 层内还能滚：先让内容滚 */
+      }
+    }
+    e.preventDefault();
+    var now = Date.now();
+    if (now - lastWheel > 240) acc = 0;
+    lastWheel = now;
+    if (now < lock){ acc = 0; return; }
+    acc += (e.deltaMode === 1 ? e.deltaY * 18 : e.deltaY);
+    if (Math.abs(acc) >= 26){
+      go(idx + (acc > 0 ? 1 : -1));
+      acc = 0;
+    }
+  }, {passive:false});
+
+  /* ---------- 触摸：触控模式 = 增益拖动（页面位移 = 手指 × GAIN）+ 方向翻页 ----------
+     原生滚动是 1:1，改不了比例，所以触控下由脚本接管拖动（touch-action:none + preventDefault）。
+     手指动 ≥6px 即定方向，松手直奔该方向前方最近的可停点；任何位置松手都会落到某一页上。 */
+  var GAIN = 1.60, DIR_TOL = 6;
+  var INTERACTIVE = 'a,button,input,select,textarea,label,summary,[role="button"],[contenteditable],#hud';
+  var tY = 0, tX = 0, tracking = false;
+  var touching = false;
+  var drag = { on: false, startCY: 0, base: 0, moved: 0, finger: 0 };
+  var grab = { active: false, dir: 0, target: null };
+
+  window.addEventListener("touchstart", function(e){
+    touching = true;
+    cancelSnap();                                 /* 新的一下开始了，撤掉未执行的吸附 */
+    var tip = e.target;
+    if (tip && tip.closest && tip.closest(INTERACTIVE)){
+      drag.on = false;                            /* 点在按钮 / 链接 / 输入控件上：不接管，交给浏览器出 click */
+      return;
+    }
+    if (touchMode){
+      if (e.cancelable) e.preventDefault();
+      var t = e.touches && e.touches[0];
+      drag.on = true;
+      drag.startCY = t ? t.clientY : 0;
+      drag.base = window.scrollY || 0;
+      drag.moved = 0; drag.finger = 0;
+      grab.active = false; grab.target = null;
+      stopSnapAnim();
+      ensureTick();
+      return;
+    }
+    if (e.touches.length !== 1){ tracking = false; return; }
+    tY = e.touches[0].clientY; tX = e.touches[0].clientX; tracking = true;
+  }, {passive:false});
+
+  function touchEnded(){
+    touching = false;
+    if (!touchMode || !drag.on) return;
+    drag.on = false;
+    var dir = drag.moved > 0 ? 1 : (drag.moved < 0 ? -1 : 0);
+    var y = window.scrollY || 0;
+    var tgt = null;
+    if (drag.finger >= DIR_TOL && dir !== 0) tgt = dir > 0 ? nextStop(y) : prevStop(y);
+    var near = nearestStop(y);
+    if (!tgt || near.d <= 12) tgt = near.p;       /* 几乎正落在某一页上：直接吸它 */
+    grab.dir = dir || (tgt.y > y ? 1 : -1);
+    grab.target = tgt;
+    grab.active = true;
+    lock = Date.now() + 380;
+    ensureTick();
+  }
+  window.addEventListener("touchend", touchEnded, {passive:true});
+  window.addEventListener("touchcancel", touchEnded, {passive:true});
+
+  /* ---------- 嵌在 iframe（rdfzai 课件等）里的外链 ----------
+     srcdoc 沙箱给了 allow-popups allow-popups-to-escape-sandbox 但没有 allow-downloads，
+     直接在同 iframe 导航会把课件顶掉、也可能被拦，所以外链一律新窗口打开；
+     新窗口被拦时退回当前 iframe 导航。 */
+  function frameHint(msg){
+    var box = document.createElement("div");
+    box.textContent = msg;
+    box.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);max-width:88%;" +
+      "background:rgba(17,24,39,.95);color:#fff;font-size:13px;line-height:1.6;padding:10px 16px;" +
+      "border-radius:10px;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,.28);opacity:0;" +
+      "transition:opacity .22s;pointer-events:none;text-align:center";
+    document.body.appendChild(box);
+    requestAnimationFrame(function(){ box.style.opacity = "1"; });
+    setTimeout(function(){ box.style.opacity = "0"; setTimeout(function(){ if (box.parentNode) box.parentNode.removeChild(box); }, 320); }, 5200);
+  }
+  function fallbackCopy(txt){
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = txt;
+      ta.setAttribute("readonly", "readonly");
+      ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:.02;border:0;padding:0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, txt.length);
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch(err){}
+  }
+  function copyText(txt){
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(function(){}, function(){ fallbackCopy(txt); });
+        return;
+      }
+    } catch(err){}
+    fallbackCopy(txt);
+  }
+  (function(){
+    var framed = false;
+    try { framed = window.top !== window.self; } catch(err){ framed = true; }
+    if (!framed) return;                          /* 独立打开（静态站/本地）：浏览器原生 a[download] 直接下载 */
+    document.addEventListener("click", function(e){
+      var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a) return;
+      var href = a.getAttribute("href") || "";
+      if (!href || href.charAt(0) === "#") return;
+      var abs = a.href;
+      var raw = abs.split("#")[0].split("?")[0];
+      var isFile = a.hasAttribute("download") || /\.(zip|exe|msi|dmg|7z|rar|patch)$/i.test(raw);
+      if (!isFile){                               /* 普通外链：新窗口打开 */
+        e.preventDefault();
+        var w = null;
+        try { w = window.open(abs, "_blank", "noopener"); } catch(err){}
+        if (!w){ try { location.href = abs; } catch(err2){} }
+        return;
+      }
+      /* 文件：先按原生方式触发下载（课件沙箱允许就直接落盘），同时把链接复制到剪贴板兜底。
+         注：课件 iframe 若未开 allow-downloads，浏览器会静默拦掉下载，所以必须给提示与可复制的链接。 */
+      var name = raw.split("/").pop() || "文件";
+      copyText(abs);
+      frameHint("正在下载 " + name + "；若几秒后没有开始，下载链接已复制——长按下面的「下载」按钮也能复制，粘到浏览器地址栏打开即可");
+    }, true);
+  })();
+
+  window.addEventListener("touchmove", function(e){
+    var t = e.touches && e.touches[0];
+    if (touchMode){
+      if (!drag.on || !t) return;
+      if (e.cancelable) e.preventDefault();
+      var d0 = drag.startCY - t.clientY;          /* 手指上滑为正 = 往下一层走 */
+      drag.finger = Math.abs(d0);
+      var mx = Math.max(0, (document.documentElement.scrollHeight || 0) - (window.innerHeight || 1));
+      var to = drag.base + d0 * GAIN;
+      to = to < 0 ? 0 : (to > mx ? mx : to);
+      window.scrollTo(0, to);
+      drag.moved = to - drag.base;
+      return;
+    }
+    if (!tracking) return;
+    markActed();
+    var dy = tY - e.touches[0].clientY;
+    var dx = Math.abs(tX - e.touches[0].clientX);
+    if (dx > Math.abs(dy)) return;
+    var st = edgeState(idx);
+    if (st.scrollable){
+      if (!((dy < 0 && st.atTop) || (dy > 0 && st.atBottom))){
+        syncArrows();
+        return;
+      }
+    }
+    if (Math.abs(dy) > 26){
+      if (e.cancelable) e.preventDefault();
+      tracking = false;
+      go(idx + (dy > 0 ? 1 : -1));
+    }
+  }, {passive:false});
+
+  /* ---------- 键盘 ---------- */
+  window.addEventListener("keydown", function(e){
+    if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " "){ e.preventDefault(); go(idx + 1); }
+    else if (e.key === "ArrowUp" || e.key === "PageUp"){ e.preventDefault(); go(idx - 1); }
+    else if (e.key === "Home"){ e.preventDefault(); go(0); }
+    else if (e.key === "End"){ e.preventDefault(); go(slides.length - 1); }
+  });
+
+  /* ---------- 当前层同步 ---------- */
+  var scrollT = 0;
+
+  function syncIdx(n){
+    n = clamp(n);
+    if (n === idx) return;
+    idx = n;
+    paint();
+    syncArrows();
+    playReveal(n);
+  }
+
+  /* 触控模式的层判定：取「可见高度最大」的那层，层高不一时也不会判错 */
+  function idxFromScroll(){
+    var vh = window.innerHeight || 1, y = window.scrollY || 0;
+    var best = 0, bestV = -1e9;
+    for (var i = 0; i < slides.length; i++){
+      var s = slides[i];
+      var vis = Math.min(y + vh, s.offsetTop + s.offsetHeight) - Math.max(y, s.offsetTop);
+      if (vis > bestV){ bestV = vis; best = i; }
+    }
+    return best;
+  }
+
+  /* ---------- 触控分页引擎 ----------
+     停点 = 各层顶 + 长内容层的「内容底边对齐屏底」；任何位置松手都落到某一停点上（必吸）。
+     绝不接管惯性（没有任何"惯性中改位置"的代码），松手后只做一次自绘缓动跑向目标。 */
+  var SNAP_STILL_MS = 40;
+  var snapRaf = 0, snapAnimRaf = 0, lastY = 0, stillSince = 0;
+
+  function stopPoints(){
+    var H = window.innerHeight || 1, a = [];
+    for (var i = 0; i < slides.length; i++){
+      var s = slides[i], ex = s.offsetHeight - H;
+      a.push({ y: Math.round(s.offsetTop), i: i });
+      if (ex > 24) a.push({ y: Math.round(s.offsetTop + ex), i: i });
+    }
+    a.sort(function(p, q){ return p.y - q.y; });
+    return a;
+  }
+  function nextStop(y){
+    var a = stopPoints();
+    for (var i = 0; i < a.length; i++) if (a[i].y > y + 2) return a[i];
+    return a[a.length - 1];
+  }
+  function prevStop(y){
+    var a = stopPoints();
+    for (var i = a.length - 1; i >= 0; i--) if (a[i].y < y - 2) return a[i];
+    return a[0];
+  }
+  function nearestStop(y){
+    var a = stopPoints(), best = a[0], bd = Infinity;
+    for (var i = 0; i < a.length; i++){
+      var d = Math.abs(a[i].y - y);
+      if (d < bd){ bd = d; best = a[i]; }
+    }
+    return { p: best, d: bd };
+  }
+
+  function stopSnapAnim(){ if (snapAnimRaf){ cancelAnimationFrame(snapAnimRaf); snapAnimRaf = 0; } }
+  function cancelSnap(){ stopSnapAnim(); grab.active = false; grab.target = null; }
+
+  /* 自绘缓动：松手后「跑」向目标页，快起慢收（无惯性拖尾，用户明确不要） */
+  function animateTo(target){
+    stopSnapAnim();
+    var from = window.scrollY || 0, dist = target - from;
+    if (Math.abs(dist) < 1.2) return;
+    if (reduce){ window.scrollTo(0, target); return; }
+    var dur = Math.max(200, Math.min(560, Math.abs(dist) * 0.42));
+    var t0 = 0;
+    function step(ts){
+      if (!t0) t0 = ts;
+      var k = Math.min(1, (ts - t0) / dur);
+      var e = 1 - Math.pow(1 - k, 4);
+      window.scrollTo(0, from + dist * e);
+      if (k < 1) snapAnimRaf = requestAnimationFrame(step);
+      else { snapAnimRaf = 0; window.scrollTo(0, target); }
+    }
+    snapAnimRaf = requestAnimationFrame(step);
+  }
+
+  function ensureTick(){
+    if (!touchMode) return;
+    if (!snapRaf) snapRaf = requestAnimationFrame(foldTick);
+  }
+
+  function foldTick(){
+    snapRaf = 0;
+    if (!touchMode) return;
+    snapRaf = requestAnimationFrame(foldTick);
+    var y = window.scrollY || 0;
+    if (touching || snapAnimRaf){ lastY = y; stillSince = 0; return; }
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    if (Math.abs(y - lastY) > 0.5){ lastY = y; stillSince = 0; }
+    else if (!stillSince){ stillSince = now; }
+    var stillMs = stillSince ? now - stillSince : 0;
+
+    if (grab.active){
+      var tgt = grab.target;
+      if (!tgt){ grab.active = false; return; }
+      if (Math.abs(y - tgt.y) < 4){ grab.active = false; syncIdx(nearestStop(y).p.i); return; }
+      grab.active = false;
+      animateTo(tgt.y);
+      return;
+    }
+    if (stillMs >= SNAP_STILL_MS){
+      var n = nearestStop(y);
+      if (n.d > 1) animateTo(n.p.y);
+      else if (n.d > 0.5) window.scrollTo(0, n.p.y);
+    }
+  }
+
+  /* ---------- 原生滚动同步（触控板惯性 / 手机） ---------- */
+  window.addEventListener("scroll", function(){
+    if (touchMode) ensureTick();                     /* 惯性一停（位置不再变化）就吸附，不排队等 240ms */
+    var now = Date.now();
+    if (now - scrollT < 60) return;
+    scrollT = now;
+    if (touchMode){ syncIdx(idxFromScroll()); return; }
+    if (now < lock) return;                       /* 程序化平滑滚动中不要回改 idx */
+    var h = slides[0].offsetHeight || 1;
+    syncIdx(Math.round((window.scrollY || 0) / h));
+  }, {passive:true});
+
+  /* ---------- 层内滚动：只更新箭头显隐 ---------- */
+  slides.forEach(function(s, i){
+    var inner = s.querySelector(".inner");
+    if (!inner) return;
+    inner.addEventListener("scroll", function(){ if (i === idx) syncArrows(); }, {passive:true});
+  });
+
+  window.addEventListener("resize", function(){
+    if (touchMode){                               /* 不跟地址栏伸缩改层高：层高一变吸附点就漂移 */
+      syncArrows();
+      clearTimeout(window.__rz);
+      window.__rz = setTimeout(syncArrows, 200);
+      return;
+    }
+    setVH(); syncArrows();
+    clearTimeout(window.__rz);
+    window.__rz = setTimeout(function(){
+      window.scrollTo(0, slides[idx].offsetTop);
+      syncArrows();
+    }, 150);
+  });
+  window.addEventListener("orientationchange", function(){
+    if (!touchMode){ return; }
+    setTimeout(function(){
+      setVH();
+      window.scrollTo(0, slides[idx].offsetTop);   /* 换方向后层高变了，重新贴顶 */
+      syncArrows();
+    }, 320);
+  });
+
+  /* ---------- 启动 ---------- */
+  idx = touchMode
+    ? idxFromScroll()
+    : clamp(Math.round((window.scrollY || 0) / (slides[0].offsetHeight || 1)));
+  slides[0].classList.add("on");
+  paint();
+  window.scrollTo(0, slides[idx].offsetTop);
+  playReveal(idx);
+  syncArrows();
+})();
+</script>
+</body>
+</html>
