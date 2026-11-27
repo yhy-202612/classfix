@@ -16,8 +16,9 @@ namespace ClassroomGoose
             { 16 * 60 + 15, 16 * 60 + 25 },
         };
 
-        internal static bool IsOpen(DateTime now, bool includeWeekends)
+        internal static bool IsOpen(DateTime now, bool includeWeekends, bool ignoreSchedule = false)
         {
+            if (ignoreSchedule) return true;
             if (!includeWeekends && (now.DayOfWeek == DayOfWeek.Saturday || now.DayOfWeek == DayOfWeek.Sunday))
                 return false;
 

@@ -20,12 +20,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from classfix import delta, update  # noqa: E402
+from evetech import delta, update  # noqa: E402
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="验证 ClassFix 差异更新")
-    parser.add_argument("--old", required=True, help="旧版解压目录（含 ClassFix.exe）")
+    parser = argparse.ArgumentParser(description="验证 EveTech 差异更新")
+    parser.add_argument("--old", required=True, help="旧版解压目录（含 EveTech.exe）")
     parser.add_argument("--patch", required=True, help="差异包 zip")
     parser.add_argument("--new", default="", help="新版全量解压目录，用于最终比对")
     args = parser.parse_args(argv)
@@ -45,7 +45,7 @@ def main(argv=None):
     print("差异包运行时指纹：%s" % (runtime or "（未声明）"))
 
     with tempfile.TemporaryDirectory() as tmp:
-        work = Path(tmp) / "ClassFix"
+        work = Path(tmp) / "EveTech"
         shutil.copytree(old_dir, work)
         before = delta.file_manifest(work)
         print("旧目录 %d 个文件 / %.1f MB" % (len(before), sum(v["size"] for v in before.values()) / 1048576.0))

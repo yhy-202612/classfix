@@ -19,7 +19,7 @@ namespace ClassroomGoose
         private volatile bool enabled;
         private Rectangle paneBounds;
         private PaneRequest paneRequest;
-        private FocusReading current = new FocusReading(FocusKind.Unknown, IntPtr.Zero, IntPtr.Zero);
+        private volatile FocusReading current = new FocusReading(FocusKind.Unknown, IntPtr.Zero, IntPtr.Zero);
         private FocusReading previous;
         private IntPtr lastEditor;
         private bool hadEditor;
@@ -108,6 +108,8 @@ namespace ClassroomGoose
         {
             using (var pane = new InputPane())
             {
+                PaneRequest retry = null;
+                var waitForTabTip = new Stopwatch();
                 while (true)
                 {
                     PaneRequest current;
@@ -118,8 +120,19 @@ namespace ClassroomGoose
                     }
                     try
                     {
-                        if (current != null) pane.SetVisible(current.Owner, current.Show);
+                        if (current != null)
+                        {
+                            retry = pane.SetVisible(current.Owner, current.Show) ? current : null;
+                            waitForTabTip.Restart();
+                        }
                         if (stopping) return;
+                        if (retry != null && waitForTabTip.ElapsedMilliseconds >= 500)
+                        {
+                            PaneRequest pending = retry;
+                            retry = null;
+                            if (enabled && Native.GetForegroundWindow() == pending.Owner)
+                                pane.SetVisible(pending.Owner, true, false);
+                        }
                         if (enabled)
                         {
                             Rectangle area = pane.Bounds();
@@ -201,7 +214,8 @@ namespace ClassroomGoose
                     if (view.ProcessId != ownProcess && view.ProcessId != processId && IsKeyboardProcess(view.ProcessId))
                         return new FocusReading(FocusKind.Keyboard, foreground, focusWindow);
 
-                    FocusKind kind = IsEditable(element, view) ? FocusKind.Editable : FocusKind.Other;
+                        FocusKind kind = IsEditable(element, view) || Native.HasEditableCaret(foreground)
+                            ? FocusKind.Editable : FocusKind.Other;
                     return new FocusReading(kind, foreground, focusWindow, element.GetRuntimeId());
                 }
             }
@@ -326,6 +340,13 @@ namespace ClassroomGoose
 
         internal Rectangle Bounds()
         {
+            Rectangle area;
+            return TryGetBounds(out area) ? area : Rectangle.Empty;
+        }
+
+        private bool TryGetBounds(out Rectangle bounds)
+        {
+            bounds = Rectangle.Empty;
             if (!triedView)
             {
                 triedView = true;
@@ -335,45 +356,61 @@ namespace ClassroomGoose
             try
             {
                 Native.Rect area;
-                if (view != null && view.Location(out area) >= 0 && area.Right > area.Left && area.Bottom > area.Top)
-                    return area.Bounds;
+                if (view != null && view.Location(out area) >= 0)
+                {
+                    if (area.Right > area.Left && area.Bottom > area.Top) bounds = area.Bounds;
+                    return true;
+                }
             }
             catch (COMException) { }
-            return Rectangle.Empty;
+            return false;
         }
 
-        internal void SetVisible(IntPtr owner, bool show)
+        // Returns true if TabTip was started and the caller should check again after it initializes.
+        internal bool SetVisible(IntPtr owner, bool show, bool startIfNeeded = true)
         {
-            if (owner == IntPtr.Zero) return;
-            Rectangle extent = Bounds();
+            if (owner == IntPtr.Zero || (show && owner != Native.GetForegroundWindow())) return false;
+            Rectangle extent;
+            bool boundsKnown = TryGetBounds(out extent);
             IntPtr legacy = Native.FindWindow("IPTip_Main_Window", null);
-            bool visible = !extent.IsEmpty || Native.Visible(legacy);
-            if ((show && visible) || SetWinRtVisibility(owner, show) || visible == show) return;
+            bool legacyVisible = Native.Visible(legacy) && Native.IsWindowEnabled(legacy);
+            bool visible = !extent.IsEmpty || legacyVisible;
+            if ((show && visible) || SetWinRtVisibility(owner, show) || (!show && !visible)) return false;
+            if (!show && legacyVisible &&
+                Native.PostMessage(legacy, 0x0112, new IntPtr(0xF060), IntPtr.Zero))
+                return false;
+
+            // Toggle only if we know the pane's current state.
+            if ((boundsKnown || legacy != IntPtr.Zero) && TryToggle()) return false;
+            return show && startIfNeeded && StartTabTip();
+        }
+
+        private bool TryToggle()
+        {
             try
             {
-                if (!show && Native.Visible(legacy) &&
-                    Native.PostMessage(legacy, 0x0112, new IntPtr(0xF060), IntPtr.Zero))
-                    return;
-
-                // The legacy toggle is only useful when the current state is known.
-                if (view == null && legacy == IntPtr.Zero) return;
                 var tip = (ITipInvocation)CreateComObject(tipClass);
-                if (tip == null) return;
-                try
-                {
-                    int hr = tip.Toggle(Native.GetDesktopWindow());
-                    if (show && hr < 0)
-                    {
-                        string file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles),
-                                                   @"Microsoft Shared\Ink\TabTip.exe");
-                        if (File.Exists(file)) Process.Start(file);
-                    }
-                }
+                if (tip == null) return false;
+                try { return tip.Toggle(Native.GetDesktopWindow()) >= 0; }
                 finally { Marshal.ReleaseComObject(tip); }
             }
             catch (COMException) { }
             catch (InvalidCastException) { }
+            return false;
+        }
+
+        private static bool StartTabTip()
+        {
+            string file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonProgramFiles),
+                                       @"Microsoft Shared\Ink\TabTip.exe");
+            if (!File.Exists(file)) return false;
+            try
+            {
+                using (Process.Start(file)) { }
+                return true;
+            }
             catch (System.ComponentModel.Win32Exception) { }
+            return false;
         }
 
         private static object CreateComObject(Guid clsid)

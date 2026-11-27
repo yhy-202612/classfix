@@ -81,7 +81,7 @@ class AccountDialog(QDialog):
 
     def __init__(self, parent, account, on_change=None):
         super().__init__(parent)
-        self.setWindowTitle("ClassFix 账号")
+        self.setWindowTitle("EveTech 账号")
         self.setModal(True)
         self.setMinimumWidth(430)
         self.account = account

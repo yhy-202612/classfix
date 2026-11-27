@@ -91,6 +91,7 @@ namespace ClassroomGoose
             goose.rig.feets = new ProceduralFeets();
             goose.rig.feets.lFootPos = goose.position;
             goose.rig.feets.rFootPos = goose.position;
+            goose.rig.neckLerpPercent = 0;
             goose.updateRig(goose.rig, goose.position, goose.direction);
         }
 

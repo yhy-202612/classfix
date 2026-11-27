@@ -5,16 +5,16 @@ import tempfile
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, "/tmp/pqt")
-sys.path.insert(0, "/sandbox/workspace/classfix-work/ClassFix")
+sys.path.insert(0, "/sandbox/workspace/evetech-work/EveTech")
 
 from PySide6.QtWidgets import QApplication, QMessageBox  # noqa: E402
 
-from classfix import cloud  # noqa: E402
-from classfix.app import create_window  # noqa: E402
-from classfix.ui.account import AccountDialog  # noqa: E402
-from classfix.ui.theme import apply_theme  # noqa: E402
+from evetech import cloud  # noqa: E402
+from evetech.app import create_window  # noqa: E402
+from evetech.ui.account import AccountDialog  # noqa: E402
+from evetech.ui.theme import apply_theme  # noqa: E402
 
-OUT = "/sandbox/workspace/classfix-work/ui-shots"
+OUT = "/sandbox/workspace/evetech-work/ui-shots"
 os.makedirs(OUT, exist_ok=True)
 
 app = QApplication([])

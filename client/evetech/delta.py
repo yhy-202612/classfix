@@ -2,7 +2,7 @@
 
 实测依据（1.1.7 → 1.3.2，跨 6 个版本）：解压后 177 MB 的包里，
 199 个文件 / 92.3 MB 字节级完全相同（全部 Qt6 dll、pyd、python312.dll、
-sqlite3、libcrypto…），真正变化只有 ClassFix.exe 与 base_library.zip，约 3.8 MB。
+sqlite3、libcrypto…），真正变化只有 EveTech.exe 与 base_library.zip，约 3.8 MB。
 
 所以只要「运行时指纹」一致，跨多个版本也能用同一份差异包升过去；
 指纹不一致（将来升 PySide6 或 Python）或差异包过大时，一律回落全量包，
@@ -21,7 +21,7 @@ from pathlib import Path
 from . import VERSION
 
 PATCH_META = "patch.json"
-PACKAGE_META = "classfix-package.json"
+PACKAGE_META = "evetech-package.json"
 
 # 「差异过大就全量」的两条线：占全包一半以上，或绝对值超过 24 MB。
 MAX_DELTA_RATIO = 0.5

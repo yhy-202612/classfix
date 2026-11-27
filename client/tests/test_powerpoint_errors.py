@@ -3,28 +3,28 @@ import sys
 import unittest
 from unittest.mock import patch
 
-from classfix.powerpoint_errors import read_powerpoint_media_errors
+from evetech.powerpoint_errors import read_powerpoint_media_errors
 
 
 class PowerPointMediaErrorTest(unittest.TestCase):
     def test_keeps_literal_localized_media_error_text(self):
         message = "PowerPoint 无法播放媒体。\n可能缺少所需的编解码器。"
         english = "Cannot play media."
-        with patch("classfix.powerpoint_errors._native_dialogs",
+        with patch("evetech.powerpoint_errors._native_dialogs",
                    return_value=[("Microsoft PowerPoint", message, "确定"),
                                  ("Microsoft PowerPoint", english, "OK"), ("", message)]) as read:
             self.assertEqual(read_powerpoint_media_errors(110), (message, english))
         read.assert_called_once_with(110)
 
     def test_never_uses_unrelated_open_errors_or_merely_media_labels(self):
-        with patch("classfix.powerpoint_errors._native_dialogs",
+        with patch("evetech.powerpoint_errors._native_dialogs",
                    return_value=[("插入视频", "无法打开此演示文稿。", "视频文件", "取消"),
                                  ("Microsoft PowerPoint", "正在播放媒体。"),
                                  ("Microsoft PowerPoint", "You are in Protected View.")]):
             self.assertEqual(read_powerpoint_media_errors(), ())
 
     def test_inaccessible_native_windows_have_no_evidence(self):
-        with patch("classfix.powerpoint_errors._native_dialogs", side_effect=OSError(5, "Access denied")):
+        with patch("evetech.powerpoint_errors._native_dialogs", side_effect=OSError(5, "Access denied")):
             self.assertEqual(read_powerpoint_media_errors(19), ())
 
     @unittest.skipUnless(sys.platform == "win32", "Win32 callbacks are only available on Windows")
@@ -75,9 +75,9 @@ class PowerPointMediaErrorTest(unittest.TestCase):
                 copied._obj.value = len(message)
                 return 1
 
-        with patch("classfix.powerpoint_errors._user32", return_value=FakeUser32()), \
-                patch("classfix.powerpoint_errors.monotonic", return_value=1.0), \
-                patch("classfix.powerpoint_errors._process_basename", side_effect={
+        with patch("evetech.powerpoint_errors._user32", return_value=FakeUser32()), \
+                patch("evetech.powerpoint_errors.monotonic", return_value=1.0), \
+                patch("evetech.powerpoint_errors._process_basename", side_effect={
                     1: "POWERPNT.EXE", 2: "POWERPNT.EXE", 3: "EXPLORER.EXE",
                 }.__getitem__):
             self.assertEqual(read_powerpoint_media_errors(10), (message,))

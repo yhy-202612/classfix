@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from classfix.preflight import (inspect_preflight, powerpoint_check, wps_check, wps_version)
+from evetech.preflight import (inspect_preflight, powerpoint_check, wps_check, wps_version)
 
 PPT = Path(r"C:\Program Files\Microsoft Office\Root\Office16\POWERPNT.EXE")
 WPP = Path(r"C:\Program Files\Kingsoft\WPS Office\12.1.0.16929\office6\wpp.exe")
@@ -17,14 +17,14 @@ def processes(*names):
 
 def run_check(check, *, powerpnt=None, server=None, alternative=None, wps=None, running=(),
               wps_running=False, hijack=None, version=""):
-    with patch("classfix.preflight.powerpnt_path", return_value=powerpnt), \
-         patch("classfix.preflight.com_server_path", return_value=server), \
-         patch("classfix.preflight.office_alternative", return_value=alternative), \
-         patch("classfix.preflight.wps_path", return_value=wps), \
-         patch("classfix.preflight.wps_running", return_value=wps_running), \
-         patch("classfix.preflight.com_taken_by_wps", return_value=hijack), \
-         patch("classfix.preflight.wps_version", return_value=version), \
-         patch("classfix.preflight.psutil.process_iter", return_value=processes(*running)):
+    with patch("evetech.preflight.powerpnt_path", return_value=powerpnt), \
+         patch("evetech.preflight.com_server_path", return_value=server), \
+         patch("evetech.preflight.office_alternative", return_value=alternative), \
+         patch("evetech.preflight.wps_path", return_value=wps), \
+         patch("evetech.preflight.wps_running", return_value=wps_running), \
+         patch("evetech.preflight.com_taken_by_wps", return_value=hijack), \
+         patch("evetech.preflight.wps_version", return_value=version), \
+         patch("evetech.preflight.psutil.process_iter", return_value=processes(*running)):
         return check()
 
 
@@ -92,14 +92,14 @@ class PreflightIntegrationTest(unittest.TestCase):
     def test_report_contains_both_office_and_wps_checks(self):
         fake = SimpleNamespace(key="x", title="t", status="ok", detail="d", extra="")
         audio = SimpleNamespace(checks=[fake], findings=[])
-        with patch("classfix.preflight.inspect_audio", return_value=audio), \
-             patch("classfix.preflight.display_check", return_value=fake), \
-             patch("classfix.preflight.network_check", return_value=fake), \
-             patch("classfix.preflight.peripheral_check", return_value=fake), \
-             patch("classfix.preflight.powerpoint_check",
+        with patch("evetech.preflight.inspect_audio", return_value=audio), \
+             patch("evetech.preflight.display_check", return_value=fake), \
+             patch("evetech.preflight.network_check", return_value=fake), \
+             patch("evetech.preflight.peripheral_check", return_value=fake), \
+             patch("evetech.preflight.powerpoint_check",
                    return_value=SimpleNamespace(key="office", title="Microsoft PowerPoint",
                                                 status="ok", detail="d", extra="")), \
-             patch("classfix.preflight.wps_check",
+             patch("evetech.preflight.wps_check",
                    return_value=SimpleNamespace(key="wps", title="WPS 演示",
                                                 status="ok", detail="d", extra="")):
             report = inspect_preflight()
@@ -115,12 +115,12 @@ class PreflightIntegrationTest(unittest.TestCase):
                                  detail="未安装 Microsoft PowerPoint（本机由 wpp.exe 占用）", extra="")
         wps = SimpleNamespace(key="wps", title="WPS 演示", status="ok",
                               detail="已安装 WPS 演示 12.1", extra="")
-        with patch("classfix.preflight.inspect_audio", return_value=audio), \
-             patch("classfix.preflight.display_check", return_value=ok), \
-             patch("classfix.preflight.network_check", return_value=ok), \
-             patch("classfix.preflight.peripheral_check", return_value=ok), \
-             patch("classfix.preflight.powerpoint_check", return_value=office), \
-             patch("classfix.preflight.wps_check", return_value=wps):
+        with patch("evetech.preflight.inspect_audio", return_value=audio), \
+             patch("evetech.preflight.display_check", return_value=ok), \
+             patch("evetech.preflight.network_check", return_value=ok), \
+             patch("evetech.preflight.peripheral_check", return_value=ok), \
+             patch("evetech.preflight.powerpoint_check", return_value=office), \
+             patch("evetech.preflight.wps_check", return_value=wps):
             report = inspect_preflight()
         titles = [finding.title for finding in report.findings]
         self.assertIn("放映监视只支持 Microsoft PowerPoint", titles)

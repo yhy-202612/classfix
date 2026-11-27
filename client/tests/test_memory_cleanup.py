@@ -3,8 +3,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from classfix import memory_cleanup as cleanup
-from classfix.memory_cleanup import CleanupStatus, MemoryReading
+from evetech import memory_cleanup as cleanup
+from evetech.memory_cleanup import CleanupStatus, MemoryReading
 
 
 class MemoryCleanupTest(unittest.TestCase):

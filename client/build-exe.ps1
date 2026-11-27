@@ -11,10 +11,10 @@ $Python = (Get-Command $Python).Source
 $Destination = [IO.Path]::GetFullPath($Destination)
 $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
 New-Item -ItemType Directory -Force -Path $BuildDirectory,$Destination | Out-Null
-if (Test-Path -LiteralPath (Join-Path $Destination 'ClassFix')) {
-    throw 'ClassFix already exists in the destination. Choose a fresh destination for the new build.'
+if (Test-Path -LiteralPath (Join-Path $Destination 'EveTech')) {
+    throw 'EveTech already exists in the destination. Choose a fresh destination for the new build.'
 }
-$icon = Join-Path $BuildDirectory 'ClassFix.ico'
+$icon = Join-Path $BuildDirectory 'EveTech.ico'
 & $Python (Join-Path $PSScriptRoot 'tools\build_icon.py') $icon
 if ($LASTEXITCODE -ne 0) { throw 'Icon generation failed.' }
 
@@ -22,17 +22,17 @@ $versionFile = Join-Path $BuildDirectory 'version_info.txt'
 & $Python (Join-Path $PSScriptRoot 'tools\make_version_info.py') $versionFile
 if ($LASTEXITCODE -ne 0) { throw 'Version info generation failed.' }
 
-& $Python -m PyInstaller --noconfirm --onedir --windowed --noupx --name ClassFix --icon $icon --version-file $versionFile `
+& $Python -m PyInstaller --noconfirm --onedir --windowed --noupx --name EveTech --icon $icon --version-file $versionFile `
     --paths $PSScriptRoot --distpath $Destination --workpath $BuildDirectory --specpath $BuildDirectory `
     --hidden-import comtypes.client.dynamic `
     --hidden-import pythoncom --hidden-import win32com.client --hidden-import win32timezone `
     (Join-Path $PSScriptRoot 'main.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
-$output = Join-Path $Destination 'ClassFix'
+$output = Join-Path $Destination 'EveTech'
 if ($DesktopGooseFolder) {
     & (Join-Path $PSScriptRoot 'desktop_goose\build.ps1') -DesktopGooseFolder $DesktopGooseFolder
 }
-$gooseHelper = Join-Path $PSScriptRoot 'desktop_goose\dist\ClassroomGoose.exe'
+$gooseHelper = Join-Path $PSScriptRoot 'desktop_goose\dist\EveTechGoose.exe'
 if (Test-Path -LiteralPath $gooseHelper -PathType Leaf) {
     $toolDirectory = Join-Path $output 'tools'
     New-Item -ItemType Directory -Force -Path $toolDirectory | Out-Null
@@ -57,4 +57,4 @@ if ($FFprobeBundle) {
 
 & $Python (Join-Path $PSScriptRoot 'tools\write_package_meta.py') $output
 if ($LASTEXITCODE -ne 0) { throw 'Package metadata failed.' }
-Write-Output (Join-Path $Destination 'ClassFix\ClassFix.exe')
+Write-Output (Join-Path $Destination 'EveTech\EveTech.exe')

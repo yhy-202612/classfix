@@ -16,6 +16,7 @@ namespace ClassroomGoose
         public bool Goose { get; set; }
         public bool Keyboard { get; set; }
         public bool Weekends { get; set; }
+        public bool DebugAlwaysShow { get; set; }
         public bool Paused { get; set; }
         public bool Slideshow { get; set; }
     }
@@ -25,7 +26,7 @@ namespace ClassroomGoose
         [STAThread]
         private static void Main(string[] args)
         {
-            if (args.Length != 1 || args[0] != "--classfix") return;
+            if (args.Length != 1 || args[0] != "--evetech") return;
             using (var input = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8))
             using (var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true })
             {
@@ -48,17 +49,18 @@ namespace ClassroomGoose
                     using (var app = new GooseApplication(folder, settings))
                     using (var dispatcher = new Control())
                     {
+                        app.CircleRequested += () => Send(output, json, "circle_screen", "");
+                        app.VisibilityChanged += message => Send(output, json, "visibility", message);
                         var ignored = dispatcher.Handle;
                         EventHandler ready = null;
                         ready = delegate
                         {
                             Application.Idle -= ready;
-                            Send(output, json, "ready", folder == null && settings.Goose
-                                ? "桌鹅文件缺失或版本不符，可在 ClassFix 设置重新选择原版。" : "");
+                            Send(output, json, "ready", settings.Goose ? app.VisibilityStatus : "Touch keyboard helper is ready.");
                             var reader = new Thread(() => Listen(input, json, app, dispatcher))
                             {
                                 IsBackground = true,
-                                Name = "ClassFix desktop pet commands"
+                                Name = "EveTech desktop pet commands"
                             };
                             reader.Start();
                         };
@@ -69,7 +71,7 @@ namespace ClassroomGoose
                 }
                 catch (Exception error)
                 {
-                    Send(output, json, "error", "桌鹅助手启动失败（" + error.GetType().Name + "）。");
+                    Send(output, json, "error", "The desktop pet helper could not start (" + error.GetType().Name + ").");
                 }
             }
         }
@@ -89,6 +91,8 @@ namespace ClassroomGoose
                     }
                     else if (command.Action == "ask")
                         dispatcher.BeginInvoke(new MethodInvoker(app.OpenFromHost));
+                    else if (command.Action == "preview")
+                        dispatcher.BeginInvoke(new MethodInvoker(app.Preview));
                 }
             }
             catch (IOException) { }
@@ -115,14 +119,25 @@ namespace ClassroomGoose
 
     internal sealed class HotkeyWindow : NativeWindow, IDisposable
     {
-        private readonly bool registered;
+        private bool registered;
         private readonly Action open;
 
         internal HotkeyWindow(Action open)
         {
             this.open = open;
-            CreateHandle(new CreateParams { Caption = "ClassFix desktop pet shortcuts", Parent = new IntPtr(-3) });
-            registered = Native.RegisterHotKey(Handle, 1, 0x4000 | 0x0001 | 0x0002, (uint)Keys.G);
+            CreateHandle(new CreateParams { Caption = "EveTech desktop pet shortcuts", Parent = new IntPtr(-3) });
+        }
+
+        internal void SetEnabled(bool enabled)
+        {
+            if (enabled == registered) return;
+            if (enabled)
+                registered = Native.RegisterHotKey(Handle, 1, 0x4000 | 0x0001 | 0x0002, (uint)Keys.G);
+            else
+            {
+                Native.UnregisterHotKey(Handle, 1);
+                registered = false;
+            }
         }
 
         protected override void WndProc(ref Message message)
@@ -135,7 +150,7 @@ namespace ClassroomGoose
 
         public void Dispose()
         {
-            if (registered) Native.UnregisterHotKey(Handle, 1);
+            SetEnabled(false);
             DestroyHandle();
         }
     }

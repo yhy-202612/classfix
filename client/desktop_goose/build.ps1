@@ -17,7 +17,7 @@ $refs = @($refs | ForEach-Object { '/r:' + (Join-Path $framework $_) })
 $refs += @('UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll') | ForEach-Object { '/r:' + (Join-Path $wpf $_) }
 $refs += '/r:' + $gooseApi
 $source = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' -File | ForEach-Object { $_.FullName })
-$app = Join-Path $dist 'ClassroomGoose.exe'
+$app = Join-Path $dist 'EveTechGoose.exe'
 $smoke = Join-Path $dist 'Smoke.exe'
 & $csc /nologo /langversion:5 /optimize+ /target:winexe "/out:$app" @refs @source
 if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }

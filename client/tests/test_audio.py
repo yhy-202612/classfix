@@ -3,9 +3,9 @@ import sys
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 
-from classfix.audio import (AudioState, Endpoint, Session, build_audio_report, read_audio,
+from evetech.audio import (AudioState, Endpoint, Session, build_audio_report, read_audio,
                             set_system_mute, set_system_volume)
-from classfix.model import Report
+from evetech.model import Report
 
 
 class AudioTest(unittest.TestCase):

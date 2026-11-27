@@ -32,7 +32,7 @@ class FlashWindow(QWidget):
         font.setBold(True)
         painter.setFont(font)
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
-                         "ClassFix 投影验证\n屏幕 %d / %d" % (self.index, self.total))
+                         "EveTech 投影验证\n屏幕 %d / %d" % (self.index, self.total))
         painter.end()
 
 

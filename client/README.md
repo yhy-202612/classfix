@@ -1,16 +1,16 @@
-# ClassFix 1.6.3
+# EveTech 1.6.8
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
 ## 教室电脑怎么启动
 
-1. 解压免安装 ZIP，保留其中完整的 `ClassFix` 文件夹及 `_internal`。
-2. 双击 `ClassFix.exe`。目标电脑无需安装 Python，也无需管理员权限。首次运行会询问是否为当前用户启用开机自启。
-3. 关闭主窗口后 ClassFix 继续在系统托盘运行。双击托盘图标可重新打开，托盘菜单可以暂停监视或完全退出。
-4. 打开 PowerPoint 后，ClassFix 会静默检查已保存的 Open XML 课件，并在右下角按故障类型提示。能读取 PowerPoint 媒体错误对话框时，会显示报错原文。
-5. 进入有视频的放映页后，ClassFix 检查 Windows 音量和静音状态。系统静音或音量低于阈值时，右下角显示音量滑块。可点击滑条跳到所选音量，也可拖动。调音期间可以继续放映，提示保留至手动关闭。
+1. 解压免安装 ZIP，保留其中完整的 `EveTech` 文件夹及 `_internal`。
+2. 双击 `EveTech.exe`。目标电脑无需安装 Python，也无需管理员权限。首次运行会询问是否为当前用户启用开机自启。
+3. 关闭主窗口后 EveTech 继续在系统托盘运行。双击托盘图标可重新打开，托盘菜单可以暂停监视或完全退出。
+4. 打开 PowerPoint 后，EveTech 会静默检查已保存的 Open XML 课件，并在右下角按故障类型提示。能读取 PowerPoint 媒体错误对话框时，会显示报错原文。
+5. 进入有视频的放映页后，EveTech 检查 Windows 音量和静音状态。系统静音或音量低于阈值时，右下角显示音量滑块。可点击滑条跳到所选音量，也可拖动。调音期间可以继续放映，提示保留至手动关闭。
 
-诊断记录和设置默认保存在 `%LOCALAPPDATA%\ClassFix\classfix.sqlite3`。备份或迁移记录前，请先退出 ClassFix，再复制数据库。测试时可通过 `CLASSFIX_DATA_DIR` 指定单独的目录。
+新安装的诊断记录和设置保存在 `%LOCALAPPDATA%\EveTech\evetech.sqlite3`。装过 ClassFix 的电脑会继续使用原有数据库，保留记录、设置和登录态。升级时先从托盘退出旧版，再解压并运行 `EveTech.exe`。在设置中保存一次开机自启选项，即可更新旧版的自启快捷方式。测试时可通过 `EVETECH_DATA_DIR` 指定单独的目录。
 
 ## 从源码运行
 
@@ -35,17 +35,17 @@ py -3.13 -m pip download --only-binary=:all: -r requirements.txt -d wheels
 
 - 支持 `.pptx`、`.pptm`、`.ppsx`、`.ppsm`、`.potx` 和 `.potm`。旧版二进制 `.ppt` 需先在 PowerPoint 中另存为上述格式，后台才能读取其媒体结构。
 - 打开课件时，后台读取每页视频引用并用 FFprobe 检查真实容器和音视频编码。外部链接丢失、媒体无法读取、或媒体不符合 PowerPoint 推荐的 MP4 / H.264 / AAC 组合时才提示。扫描过程不显示进度窗口，也不会修改课件。
-- 放映监视通过当前页媒体形状或课件扫描结果确认视频页。播放器从播放或暂停转为未就绪时，ClassFix 会单独提示播放状态异常。能读取 PowerPoint 原生媒体错误对话框时会显示原文，未确认关联页码时省略页码。
+- 放映监视通过当前页媒体形状或课件扫描结果确认视频页。播放器从播放或暂停转为未就绪时，EveTech 会单独提示播放状态异常。能读取 PowerPoint 原生媒体错误对话框时会显示原文，未确认关联页码时省略页码。
 - 只在当前放映页确实含视频时检查音量。同一次放映中，同一页只提醒一次。音量滑条调整 Windows 默认媒体输出的系统总音量，默认提醒阈值为 25%，可在「设置 → 后台监视」修改。
 - 黑色提示从屏幕右侧滑入右下角。连续出现时，现有提示先平滑上移让位，新提示进入最下方。屏幕放不下的提示会排队，课堂提示不会切走 PowerPoint 的键盘焦点。
 - 媒体故障会写入本地「诊断记录」，包括已知课件名、页码、检测依据，以及读到的 PowerPoint 原始报错或接口错误码。报错提示停留约 12 秒，底边细线平滑收短，走完后提示从右侧滑出。
 - 监视期间订阅 Windows Application 中的 PowerPoint 崩溃或无响应事件，按报告 ID 查找可访问的已有 Windows 错误报告。出现实际播放异常且能确认关联的 PowerPoint 进程时，可采集最多 8 秒 ETW。是否可采集取决于本机 Windows 权限。可在设置中关闭短时追踪。
-- 开机自启使用当前用户的 Windows“启动”文件夹，不需要管理员权限。移动免安装文件夹后，请启动一次新的 `ClassFix.exe`，再到设置中重新保存开机自启选项。
+- 开机自启使用当前用户的 Windows“启动”文件夹，不需要管理员权限。移动免安装文件夹后，请启动一次新的 `EveTech.exe`，再到设置中重新保存开机自启选项。
 
 ### 低配置教室电脑
 
 - 自动课件检测一次只处理一份课件，课件内重复使用的视频只探测一次。后台 FFprobe 以较低的进程优先级运行，给正在使用的程序留出 CPU 时间。
-- 每 5 秒用开源 `psutil` 读取一次系统内存。连续两次达到 85% 或可用内存低于 800 MiB 时提醒，弹窗用百分比和进度条显示占用。关闭后冷却两分钟，持续高占用才会再次提醒。也可以点击「1 小时内不再提醒」，此选择在重启 ClassFix 后仍有效。
+- 每 5 秒用开源 `psutil` 读取一次系统内存。连续两次达到 85% 或可用内存低于 800 MiB 时提醒，弹窗用百分比和进度条显示占用。关闭后冷却两分钟，持续高占用才会再次提醒。也可以点击「1 小时内不再提醒」，此选择在重启 EveTech 后仍有效。
 - 课前关闭 PowerPoint，再点「优化内存」和「确认优化」，并允许 Windows 管理员授权。短时运行的辅助进程依次处理全局工作集、文件缓存、已修改页、待机页、低优先级待机页、注册表整理和物理页合并。这些操作会影响前台程序，重新加载内存页可能使程序短时变慢。检测到 PowerPoint 后跳过剩余操作。 [旧 PCL 社区版内存优化源码](https://github.com/PCL-Community/PCL-CE/blob/7b5c912ffa29ef5554d069e7605d3faa99238c4a/PCL.Core/App/Tools/MemSwapService.cs)
 - 优化结果保留到手动关闭。弹窗显示整机可用内存和占用率的前后实测值，以及每项操作是否成功、跳过或失败。可以从同一弹窗打开 Windows 任务管理器。
 
@@ -61,7 +61,7 @@ py -3.13 -m pip download --only-binary=:all: -r requirements.txt -d wheels
 
 ### FFprobe
 
-完整免安装包已经包含 LGPL 共享版 FFprobe 及其运行库。自行构建时也可以从 FFmpeg 下载页获取与电脑架构匹配的构建。将 `ffprobe.exe` 及共享构建所需 DLL 放在 ClassFix 的 `tools` 子目录中，或在「设置 → 媒体检测」选择它。 [FFmpeg 下载](https://ffmpeg.org/download.html)
+完整免安装包已经包含 LGPL 共享版 FFprobe 及其运行库。自行构建时也可以从 FFmpeg 下载页获取与电脑架构匹配的构建。将 `ffprobe.exe` 及共享构建所需 DLL 放在 EveTech 的 `tools` 子目录中，或在「设置 → 媒体检测」选择它。 [FFmpeg 下载](https://ffmpeg.org/download.html)
 
 ### 声音与教室设备
 
@@ -71,22 +71,32 @@ py -3.13 -m pip download --only-binary=:all: -r requirements.txt -d wheels
 ### 配置 AI 辅助分析
 
 1. 在「设置」中输入服务商的完整 `https://…/v1/chat/completions` 地址与模型名并保存。仅回环地址支持明文 HTTP，可接入本机兼容服务。
-2. API 密钥可在设置里输入，存于本次运行的内存；也可在启动环境中设置 `CLASSFIX_AI_KEY`。密钥不落盘。
+2. API 密钥可在设置里输入，存于本次运行的内存；也可在启动环境中设置 `EVETECH_AI_KEY`。密钥不落盘。
 3. 在诊断结果页点「分析复杂情况」。选择已执行的操作，检查预览，再点「确认发送并分析」。请求数据只包含列入允许清单的检测状态、编码枚举、数值、选择题回答和少数错误码。课件、视频、路径、设备名和原始日志留在本机。
 4. AI 回复以纯文本建议显示。按建议处理后可回到结果页复测。未配置服务时仍可完成本地诊断。
 
-ClassFix 的检测为只读。修复由教师通过 PowerPoint 或 Windows 设置执行。
+EveTech 的检测为只读。修复由教师通过 PowerPoint 或 Windows 设置执行。
 
-### ClassFix 桌宠与触摸键盘
+### 截图问 AI
 
-- 在「设置 → ClassFix 桌宠」选择已解压的 Windows Desktop Goose v0.31，再保存设置。ClassFix 使用原版的步态与绘制，桌鹅随 ClassFix 启停。托盘菜单提供「问鹅」和「暂停鹅出场」。
-- 鹅在课间、眼保健操、课间操和午休静音游荡，上课时走回屏幕外。放映和手动暂停优先。课表默认工作日，可在设置中启用周末。 [Desktop Goose 官方下载](https://samperson.itch.io/desktop-goose)
-- 在同一设置页点「使用 DeepSeek」，填入 API 密钥并保存。桌鹅复用 ClassFix 当前运行的官方 DeepSeek 密钥，密钥不落盘。点鹅打开聊天气泡，也可从 ClassFix 托盘或按 `Ctrl+Alt+G` 提问。安全检查通过的完整回答由鹅拖入屏幕并轻叫一声。桌鹅不能出场时可在提问框查看。 [DeepSeek 内容安全说明](https://api-docs.deepseek.com/guides/safety/)
-- 「全局触摸键盘」可以独立启用。它用 Windows 的输入焦点和可编辑状态控制系统键盘，离开编辑区时收起。不同应用使用同一套判断，第三方自绘控件可能需要 Windows 任务栏的键盘按钮。 [Windows 触摸键盘说明](https://support.microsoft.com/zh-CN/Windows/Hardware/Input-Devices/enable-and-disable-the-touch-keyboard-in-windows)
+1. 点桌鹅，在气泡中选择 **Circle Screen**。也可以右键托盘图标选择「截图问 AI」，或点主窗口顶部的「截图问 AI」。
+2. 在指针所在的显示器上拖出截图范围。在预览里用鼠标或手指圈画，可撤销上一笔或重新截图。
+3. 输入问题，点「发送截图和问题」。确认预览、服务地址和模型后发送，回答会留在窗口里。
+
+在「设置 → AI 辅助分析」使用支持图片输入的 Chat Completions 模型。使用官方 DeepSeek 时，地址填 `https://api.deepseek.com/chat/completions`，模型填 `deepseek-flash`，再填 API 密钥并保存。截图留在内存中，确认前不会发送。 [DeepSeek 图片输入文档](https://api-docs.deepseek.com/guides/vision/)
+
+### Desktop Goose and touch keyboard
+
+- In Settings, open **Desktop Pet**, choose the extracted Windows Desktop Goose v0.31 folder, select **Enable Desktop Goose**, and click **Save Settings**. After setup, right-click the EveTech tray icon and select **Enable Desktop Goose** to turn the pet on or off immediately. This setting is saved across restarts. The **Desktop Goose** submenu offers **Ask Goose**, **Pause Desktop Goose**, and **Desktop Pet Settings…**. [Official Desktop Goose download](https://samperson.itch.io/desktop-goose)
+- The goose roams quietly during school breaks, eye exercises, group exercises, and lunch break. It walks offscreen when the next class starts. The schedule applies on weekdays by default. **Debug mode: ignore the school schedule** lets the goose roam any time, including weekends.
+- Select **Preview Goose** in **Desktop Pet** to see it for 30 seconds on the primary display outside school hours. The status below the button reports schedule, manual pause, full-screen, or setup issues.
+- When a PowerPoint slideshow starts, the goose walks into a small straw nest on the slideshow display. Drag the nest to move it without taking keyboard focus from PowerPoint. The goose follows the new position while walking. **Pause Desktop Goose** hides the nest and the goose.
+- Select **Configure DeepSeek…** to enter a session-only API key for English chat. Click the goose, select **Ask Goose** in the tray, or press `Ctrl+Alt+G` to open the bubble. Select **Type Question** to expand the text chat or **Circle Screen** to close the bubble and select a screen region. The goose can deliver a completed text-chat answer after it passes the classroom content checks. If the goose is hidden, the answer remains in the chat. [DeepSeek content safety](https://api-docs.deepseek.com/guides/safety/)
+- **Show the touch keyboard when editing text** works independently. It follows editable focus and hides the Windows keyboard when focus leaves the editor. Use the Windows taskbar keyboard button for apps whose custom controls do not expose editable focus. [Windows touch keyboard](https://support.microsoft.com/en-us/windows/hardware/input-devices/enable-and-disable-the-touch-keyboard-in-windows)
 
 ## 构建 EXE
 
-在 Windows 的源码目录运行以下命令。脚本生成 PyInstaller **目录式**应用，`dist\ClassFix\ClassFix.exe` 与同级 `_internal` 需一起使用。
+在 Windows 的源码目录运行以下命令。脚本生成 PyInstaller **目录式**应用，`dist\EveTech\EveTech.exe` 与同级 `_internal` 需一起使用。
 
 ```powershell
 & .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
@@ -94,11 +104,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-exe.ps1 `
   -FFprobeBundle C:\path\to\ffmpeg-lgpl-shared
 ```
 
-这里的执行策略参数仅用于该次构建进程。`-FFprobeBundle` 接受已解压的 FFmpeg 目录，脚本会复制 `ffprobe.exe`、同目录 DLL 和许可证。可使用 `-Python`、`-Destination` 和 `-BuildDirectory` 覆盖路径。再次构建时可选择新的目标目录。将整个 `dist\ClassFix` 压缩后分发。面向校内批量部署时，可由学校按自身流程为构建签名。 [Qt 的 PyInstaller 打包文档](https://doc.qt.io/qtforpython-6/deployment/deployment-pyinstaller.html)
+这里的执行策略参数仅用于该次构建进程。`-FFprobeBundle` 接受已解压的 FFmpeg 目录，脚本会复制 `ffprobe.exe`、同目录 DLL 和许可证。可使用 `-Python`、`-Destination` 和 `-BuildDirectory` 覆盖路径。再次构建时可选择新的目标目录。将整个 `dist\EveTech` 压缩后分发。面向校内批量部署时，可由学校按自身流程为构建签名。 [Qt 的 PyInstaller 打包文档](https://doc.qt.io/qtforpython-6/deployment/deployment-pyinstaller.html)
 
-构建桌宠完整包时加上 `-DesktopGooseFolder C:\path\to\DesktopGoose-v0.31`。脚本使用 .NET Framework C# 编译器参考原版 Mod SDK，把生成的助手放进 `tools`。原版程序和素材由使用者从官网取得。
+To build the Desktop Goose helper, add `-DesktopGooseFolder C:\path\to\DesktopGoose-v0.31`. The script builds against the original Mod SDK with the .NET Framework C# compiler and installs the helper in `tools`. Get the original program and assets from the official download.
 
-打包脚本还会做两件事：用 `tools\make_version_info.py` 依据 `classfix.VERSION` 生成版本资源（右键 exe → 属性 可看到版本号，不会与代码里的版本号走偏），并写入 `classfix-package.json`，供「从文件更新」识别包版本。
+打包脚本还会做两件事：用 `tools\make_version_info.py` 依据 `evetech.VERSION` 生成版本资源（右键 exe → 属性 可看到版本号，不会与代码里的版本号走偏），并写入 `evetech-package.json`，供「从文件更新」识别包版本。
 
 ## 发布与更新
 
@@ -106,10 +116,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-exe.ps1 `
 
 ```powershell
 & .\.venv\Scripts\python.exe tools\release.py `
-  --source dist\ClassFix --output release --notes release-notes.md
+  --source dist\EveTech --output release --notes release-notes.md
 ```
 
-`tools\release.py` 会把目录打成 `ClassFix-<版本>-Windows-x64.zip`、计算 SHA256、生成 `update.json`（含版本、下载地址、SHA256、大小、更新说明）。把 zip 与 `update.json` 放到同一个公开目录即可；`update.json` 里的下载地址由 `--base-url` 决定，默认指向班级网站的站点目录。
+`tools\release.py` 会把目录打成 `EveTech-<版本>-Windows-x64.zip`、计算 SHA256、生成 `update.json`（含版本、下载地址、SHA256、大小、更新说明）。把 zip 与 `update.json` 放到同一个公开目录即可；`update.json` 里的下载地址由 `--base-url` 决定，默认指向班级网站的站点目录。
 
 用户侧的三种升级方式：
 
@@ -119,14 +129,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-exe.ps1 `
 | 从文件更新 | 把 zip 拷到机器上，设置页点「从文件更新…」选中它 | 教室机器不能联网 |
 | 手动替换 | 解压后覆盖原程序目录 | 程序入口被占用、替换失败时兜底 |
 
-安全边界：只接受 HTTPS 下载地址（本机回环地址例外，方便自测）、强制核对 SHA256、压缩包内只允许单层目录、所有路径都做穿越检查；升级只替换程序目录，诊断记录与设置留在 `%LOCALAPPDATA%\ClassFix`，不会被覆盖。
+安全边界：只接受 HTTPS 下载地址（本机回环地址例外，方便自测）、强制核对 SHA256、压缩包内只允许单层目录、所有路径都做穿越检查；升级只替换程序目录，诊断记录与设置留在 `%LOCALAPPDATA%\EveTech`，不会被覆盖。
 
 ## 测试
 
 ```powershell
 # 路径仅在 FFmpeg 和 FFprobe 未加入 PATH 时需要
-$env:CLASSFIX_TEST_FFMPEG = 'C:\ffmpeg\bin\ffmpeg.exe'
-$env:CLASSFIX_TEST_FFPROBE = 'C:\ffmpeg\bin\ffprobe.exe'
+$env:EVETECH_TEST_FFMPEG = 'C:\ffmpeg\bin\ffmpeg.exe'
+$env:EVETECH_TEST_FFPROBE = 'C:\ffmpeg\bin\ffprobe.exe'
 & .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
 ```
 
@@ -142,8 +152,8 @@ QT_QPA_PLATFORM=offscreen python3 tools/test_monitor_linux.py
 可对目录式发布包做冒烟测试。以下命令启动窗口、执行实机巡检并输出 JSON 后退出：
 
 ```powershell
-$report = Join-Path (Get-Location) 'classfix-smoke.json'
-$run = Start-Process .\dist\ClassFix\ClassFix.exe -ArgumentList "--smoke-test `"$report`"" -PassThru -Wait
+$report = Join-Path (Get-Location) 'evetech-smoke.json'
+$run = Start-Process .\dist\EveTech\EveTech.exe -ArgumentList "--smoke-test `"$report`"" -PassThru -Wait
 $run.ExitCode
 ```
 
@@ -151,20 +161,45 @@ $run.ExitCode
 
 | 模块 | 职责 |
 |---|---|
-| `classfix/ui/` | Qt Widgets 页面、向导、后台任务与结果展示 |
-| `classfix/pptx.py` | 只读 PPTX 引用解析和本地 FFprobe 探测 |
-| `classfix/find.py` | 缺失视频的本机查找与课件链接改指（改前备份、改后校验） |
-| `classfix/flow.py` | 症状分支、依据、排序、建议与反馈后的复测路径 |
-| `classfix/audio.py` | Windows 音频输出、音量和 PowerPoint 会话 |
-| `classfix/preflight.py`、`classfix/pnp.py` | 显示、网络、PowerPoint 与即插即用设备 |
-| `classfix/monitor.py`、`classfix/ui/overlay.py` | PowerPoint 后台监视与右下角放映提示 |
-| `classfix/startup.py`、`classfix/ui/tray.py` | 当前用户开机自启与系统托盘常驻 |
-| `classfix/ai.py` | 证据摘要、可配置接口与响应处理 |
-| `classfix/update.py` | 版本比较、更新清单、下载校验、安全解压与替换脚本 |
-| `classfix/storage.py` | SQLite 历史与设置 |
+| `evetech/ui/` | Qt Widgets 页面、向导、后台任务与结果展示 |
+| `evetech/pptx.py` | 只读 PPTX 引用解析和本地 FFprobe 探测 |
+| `evetech/find.py` | 缺失视频的本机查找与课件链接改指（改前备份、改后校验） |
+| `evetech/flow.py` | 症状分支、依据、排序、建议与反馈后的复测路径 |
+| `evetech/audio.py` | Windows 音频输出、音量和 PowerPoint 会话 |
+| `evetech/preflight.py`、`evetech/pnp.py` | 显示、网络、PowerPoint 与即插即用设备 |
+| `evetech/monitor.py`、`evetech/ui/overlay.py` | PowerPoint 后台监视与右下角放映提示 |
+| `evetech/startup.py`、`evetech/ui/tray.py` | 当前用户开机自启与系统托盘常驻 |
+| `evetech/ai.py` | 证据摘要、可配置接口与响应处理 |
+| `evetech/update.py` | 版本比较、更新清单、下载校验、安全解压与替换脚本 |
+| `evetech/storage.py` | SQLite 历史与设置 |
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.6.8
+
+- Added **Preview Goose** and visibility status messages. The folder picker recognizes the original archive's outer folders, and framed maximized windows no longer count as full screen.
+
+### 1.6.7
+
+- The goose walks into its nest when a PowerPoint slideshow starts.
+
+### 1.6.6
+
+- 新增截图问 AI。支持区域截取、圈画标注、撤销和发送前确认。
+- Added a draggable **Goose Nest** during PowerPoint slideshows.
+
+### 1.6.5
+
+- Added **Enable Desktop Goose** to the main tray menu, synced with Desktop Pet in Settings.
+- Turning off Desktop Goose also closes its chat and releases the Ask Goose shortcut. The touch keyboard runs independently.
+- Desktop Pet setup and save messages are in English.
+
+### 1.6.4
+
+- 项目更名为 EveTech。Windows 主程序、安装目录、版本资源和发布包使用新名称。
+- Desktop Pet settings, tray actions, chat, and answer cards are in English. Debug mode lets the goose roam any time while still honoring slideshows, full-screen windows, and manual pause.
+- Retained the touch keyboard fix. Existing ClassFix settings and diagnosis records remain available.
 
 ### 1.5.2
 

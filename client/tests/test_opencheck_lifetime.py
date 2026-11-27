@@ -3,7 +3,7 @@ import unittest
 from types import ModuleType
 from unittest.mock import Mock, PropertyMock, patch
 
-from classfix.opencheck import _com_open_direct
+from evetech.opencheck import _com_open_direct
 
 
 class FakeComError(Exception):

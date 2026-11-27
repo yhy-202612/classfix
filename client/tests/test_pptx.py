@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from zipfile import ZipFile
 
-from classfix.flow import diagnose, questions
-from classfix.pptx import external_path, probe_asset, probe_file, read_deck
+from evetech.flow import diagnose, questions
+from evetech.pptx import external_path, probe_asset, probe_file, read_deck
 
 P = "http://schemas.openxmlformats.org/presentationml/2006/main"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -109,8 +109,8 @@ class PptxTest(unittest.TestCase):
         self.assertNotIn("source", [q.key for q in questions("silent", {}, True)])
 
     def test_real_ffprobe_reads_codecs_for_embedded_and_linked_video(self):
-        ffmpeg = os.environ.get("CLASSFIX_TEST_FFMPEG") or shutil.which("ffmpeg")
-        ffprobe = os.environ.get("CLASSFIX_TEST_FFPROBE") or shutil.which("ffprobe")
+        ffmpeg = os.environ.get("EVETECH_TEST_FFMPEG") or shutil.which("ffmpeg")
+        ffprobe = os.environ.get("EVETECH_TEST_FFPROBE") or shutil.which("ffprobe")
         if not (ffmpeg and ffprobe):
             self.skipTest("FFmpeg and FFprobe are required for codec integration.")
         clip = self.base / "clip with space.mp4"

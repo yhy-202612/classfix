@@ -6,10 +6,10 @@ from PySide6.QtGui import QColor
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
-from classfix.monitor import MediaProblem
-from classfix.memory_cleanup import CleanupStatus, MemoryCleanup, MemoryReading
-from classfix.ui.overlay import FormatPopup, MediaAlerts, MemoryPopup, VolumePopup
-from classfix.ui.popup_stack import PopupStack
+from evetech.monitor import MediaProblem
+from evetech.memory_cleanup import CleanupStatus, MemoryCleanup, MemoryReading
+from evetech.ui.overlay import FormatPopup, MediaAlerts, MemoryPopup, VolumePopup
+from evetech.ui.popup_stack import PopupStack
 
 
 def synchronous_job(operation, ready, _failed):
@@ -123,9 +123,9 @@ class OverlayTest(unittest.TestCase):
 
     def test_memory_meter_updates_after_cleanup_and_stays_visible_until_closed(self):
         popup = self.popup(MemoryPopup)
-        with patch("classfix.ui.overlay.monotonic", return_value=100), \
-             patch("classfix.ui.overlay.run_job", side_effect=synchronous_job), \
-             patch("classfix.ui.overlay.optimize_system_memory") as optimize:
+        with patch("evetech.ui.overlay.monotonic", return_value=100), \
+             patch("evetech.ui.overlay.run_job", side_effect=synchronous_job), \
+             patch("evetech.ui.overlay.optimize_system_memory") as optimize:
             steps = (CleanupStatus.SUCCEEDED, CleanupStatus.SKIPPED, *([CleanupStatus.FAILED] * 5))
             optimize.return_value = MemoryCleanup(MemoryReading(700, 89), MemoryReading(740, 86), steps)
             popup.notify(89, 700)
@@ -151,10 +151,10 @@ class OverlayTest(unittest.TestCase):
             self.assertIn("89% → 86%", popup.detail.text())
             self.assertIn("700 MiB → 740 MiB", popup.detail.text())
             popup.close()
-        with patch("classfix.ui.overlay.monotonic", return_value=219):
+        with patch("evetech.ui.overlay.monotonic", return_value=219):
             popup.notify(90, 650)
             self.assertFalse(popup.isVisible())
-        with patch("classfix.ui.overlay.monotonic", return_value=220):
+        with patch("evetech.ui.overlay.monotonic", return_value=220):
             popup.notify(90, 650)
             self.assertTrue(popup.isVisible())
 
@@ -162,26 +162,26 @@ class OverlayTest(unittest.TestCase):
         saved = []
         popup = MemoryPopup(self.app, self.stack, store_snooze=saved.append)
         self.addCleanup(popup.close)
-        with patch("classfix.ui.overlay.time", return_value=1000):
+        with patch("evetech.ui.overlay.time", return_value=1000):
             popup.notify(90, 650)
             popup.snooze_button.click()
             self.assertFalse(popup.isVisible())
         self.assertEqual(saved, [4600])
         reopened = MemoryPopup(self.app, self.stack, str(saved[0]))
         self.addCleanup(reopened.close)
-        with patch("classfix.ui.overlay.time", return_value=4599):
+        with patch("evetech.ui.overlay.time", return_value=4599):
             reopened.notify(90, 650)
             self.assertFalse(reopened.isVisible())
-        with patch("classfix.ui.overlay.time", return_value=4600):
+        with patch("evetech.ui.overlay.time", return_value=4600):
             reopened.notify(90, 650)
             self.assertTrue(reopened.isVisible())
 
     def test_failed_volume_write_restores_controls_and_reports_failure(self):
         popup = self.popup(VolumePopup)
         popup.notify(2, 12, True)
-        with patch("classfix.ui.overlay.run_job", side_effect=synchronous_job), \
-             patch("classfix.ui.overlay.read_system_volume", return_value=(12, True)), \
-             patch("classfix.ui.overlay.set_system_volume", return_value=False) as write:
+        with patch("evetech.ui.overlay.run_job", side_effect=synchronous_job), \
+             patch("evetech.ui.overlay.read_system_volume", return_value=(12, True)), \
+             patch("evetech.ui.overlay.set_system_volume", return_value=False) as write:
             popup.slider.setValue(55)
             popup._flush_write()
             write.assert_called_once_with(55)
@@ -197,8 +197,8 @@ class OverlayTest(unittest.TestCase):
         slider = popup.slider
         w, y = slider.width(), slider.height() // 2
         point = QPoint(3 * w // 4, y)
-        with patch("classfix.ui.overlay.run_job", side_effect=synchronous_job), \
-             patch("classfix.ui.overlay.set_system_volume", return_value=True) as write:
+        with patch("evetech.ui.overlay.run_job", side_effect=synchronous_job), \
+             patch("evetech.ui.overlay.set_system_volume", return_value=True) as write:
             QTest.mouseClick(slider, Qt.MouseButton.LeftButton, pos=point)
             self.assertGreater(slider.value(), 69)
             self.assertLess(slider.value(), 81)
@@ -217,8 +217,8 @@ class OverlayTest(unittest.TestCase):
         popup = self.popup(VolumePopup)
         popup.notify(2, 10, False)
         jobs = []
-        with patch("classfix.ui.overlay.run_job", side_effect=lambda *args: jobs.append(args)), \
-             patch("classfix.ui.overlay.set_system_volume", return_value=True) as write:
+        with patch("evetech.ui.overlay.run_job", side_effect=lambda *args: jobs.append(args)), \
+             patch("evetech.ui.overlay.set_system_volume", return_value=True) as write:
             popup.slider.setValue(30)
             popup._flush_write()
             for value in (34, 55, 75):

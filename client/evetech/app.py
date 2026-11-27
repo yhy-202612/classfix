@@ -11,7 +11,7 @@ from . import VERSION
 from . import cloud
 from .ai import AIConfig, AIError, validate_config
 from .audio import inspect_audio
-from .desktop_goose import DesktopGoose
+from .desktop_goose import DesktopGoose, original_goose_available
 from .instance import SingleInstance
 from .layered import LayeredDiagnostics
 from .monitor import PowerPointWatcher
@@ -29,9 +29,11 @@ from .ui.popup_stack import PopupStack
 from .ui.preferences import AnalysisDialog, SettingsPage
 from .ui.report import set_rule_provider
 from .ui.jobs import run_job
+from .ui.screenshot import ScreenshotTool
 from .ui.tray import TrayIcon
 from .ui.theme import apply_theme
 from .ui.video import VideoPage
+from .ui.widgets import button
 from .ui.window import AidPage, HomePage, MainWindow
 
 
@@ -95,7 +97,7 @@ def create_window(directory=None):
             return
         answer = QMessageBox.question(
             window, "投影验证",
-            "已在 %d 块副屏上闪示 4 秒蓝色画面，画面写着「ClassFix 投影验证」。\n\n"
+            "已在 %d 块副屏上闪示 4 秒蓝色画面，画面写着「EveTech 投影验证」。\n\n"
             "教学屏（投影）上是否出现了这个画面？" % count,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes)
@@ -187,7 +189,7 @@ def create_window(directory=None):
             answer = QMessageBox.question(
                 window, "AI 尚未配置",
                 "AI 辅助分析需要下面任意一条通道：\n\n"
-                "· 登录 ClassFix 账号，用积分调用云端诊断（每天赠送 5 积分，诊断每次 1~2 积分）\n"
+                "· 登录 EveTech 账号，用积分调用云端诊断（每天赠送 5 积分，诊断每次 1~2 积分）\n"
                 "· 或者填写自己的 API 密钥直连，不消耗积分\n\n"
                 "现在去「设置」配置吗？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -219,6 +221,8 @@ def create_window(directory=None):
             tray.monitor_action.blockSignals(False)
         desktop_goose = getattr(window, "desktop_goose", None)
         if desktop_goose is not None:
+            if tray is not None and tray.goose_enabled_action is not None:
+                tray.goose_enabled_action.setChecked(desktop_goose.goose_enabled())
             desktop_goose.refresh()
 
     def account_changed():
@@ -274,15 +278,40 @@ def wire_monitor_popups(watcher, media_alerts, volume_popup):
     volume_popup.dismissed.connect(watcher.suppress_current_playback)
 
 
+def wire_desktop_goose_tray(window, preferences, desktop_goose, open_goose_settings):
+    tray = window.tray
+    action = tray.goose_enabled_action
+
+    def set_enabled(enabled):
+        if enabled and not original_goose_available(window.settings_values.get("desktop_goose_folder", "")):
+            action.setChecked(desktop_goose.goose_enabled())
+            open_goose_settings()
+            preferences.goose_status.setText("Choose the extracted Desktop Goose v0.31 folder and click Save Settings.")
+            return
+        value = "1" if enabled else "0"
+        if not window.save_settings({"desktop_goose_enabled": value}):
+            action.setChecked(desktop_goose.goose_enabled())
+            tray.showMessage("Desktop Goose", "Could not save the Desktop Goose setting.",
+                             QSystemTrayIcon.MessageIcon.Warning)
+            return
+        window.settings_values["desktop_goose_enabled"] = value
+        preferences.goose_enabled.setChecked(enabled)
+        preferences.goose_status.setText("Desktop Goose is enabled." if enabled else "Desktop Goose is off.")
+        desktop_goose.refresh()
+
+    action.setChecked(desktop_goose.goose_enabled())
+    action.triggered.connect(set_enabled)
+
+
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("ClassFix")
-    app.setOrganizationName("ClassFix")
+    app.setApplicationName("EveTech")
+    app.setOrganizationName("EveTech")
     app.setQuitOnLastWindowClosed(False)
 
     try:
         cleanup_staging()
-        # 上次更新被打断时会在安装目录上一级留下 ClassFix-update-*.bat，
+        # 上次更新被打断时会在安装目录上一级留下 EveTech-update-*.bat，
         # 用户容易把它当成安装包去双击（又跑一遍旧流程）。启动即清掉。
         cleanup_scripts()
     except OSError:
@@ -300,6 +329,7 @@ def main():
                 window.raise_()
                 window.activateWindow()
 
+        # Share the guard with existing ClassFix versions that use the same database.
         instance = SingleInstance("ClassFix-PowerPoint-Monitor", data_directory() / "instance.lock", receive, app)
         state = instance.listen()
         if state == "handoff":
@@ -307,10 +337,10 @@ def main():
         if state == "blocked":
             owner = instance.lock_owner()
             QMessageBox.warning(
-                None, "ClassFix 已在运行",
-                "已经有一个 ClassFix 在运行%s。\n\n"
+                None, "EveTech 已在运行",
+                "已经有一个 EveTech 在运行%s。\n\n"
                 "如果那是旧版本，它会让新版「装上去了却打不开」：请到屏幕右下角托盘里"
-                "右键 ClassFix 图标选择「退出」，然后再启动新版。\n\n"
+                "右键 EveTech 图标选择「退出」，然后再启动新版。\n\n"
                 "如果只是想打开窗口，直接在托盘图标上双击即可。"
                 % (("（进程号 %s）" % owner) if owner else ""))
             return 0
@@ -350,6 +380,7 @@ def main():
     desktop_goose = DesktopGoose(window.settings_values, preferences.config, window)
     window.desktop_goose = desktop_goose
     desktop_goose.status.connect(preferences.goose_status.setText)
+    preferences.goose_preview.clicked.connect(desktop_goose.preview)
     window.watcher.slideshow_changed.connect(desktop_goose.set_slideshow)
     app.aboutToQuit.connect(desktop_goose.shutdown)
     app.aboutToQuit.connect(window.watcher.shutdown)
@@ -360,6 +391,20 @@ def main():
         window.activateWindow()
         window.navigate("settings")
         settings_scroll.ensureWidgetVisible(preferences.goose_panel)
+
+    def open_screenshot_ai_settings():
+        window.showNormal()
+        window.raise_()
+        window.activateWindow()
+        window.navigate("settings")
+        settings_scroll.ensureWidgetVisible(preferences.url, 20, 80)
+
+    screenshot = ScreenshotTool(
+        preferences.config, open_screenshot_ai_settings,
+        lambda message: QMessageBox.warning(window, "截图问 AI", message),
+    )
+    desktop_goose.circle_requested.connect(screenshot.start)
+    window.bar_extra.insertWidget(0, button("截图问 AI", screenshot.start))
 
     def quit_application():
         window.allow_exit = True
@@ -373,7 +418,9 @@ def main():
     window.quit_application = quit_application
 
     if QSystemTrayIcon.isSystemTrayAvailable():
-        window.tray = TrayIcon(window, window.watcher, quit_application, desktop_goose, open_goose_settings)
+        window.tray = TrayIcon(window, window.watcher, quit_application, desktop_goose, open_goose_settings,
+                               screenshot.start)
+        wire_desktop_goose_tray(window, preferences, desktop_goose, open_goose_settings)
         window.background_enabled = True
         window.tray.monitor_action.setChecked(window.settings_values.get("monitor_enabled", "1") != "0")
 
@@ -410,8 +457,8 @@ def main():
         if not getattr(sys, "frozen", False) or window.settings_values.get("startup_prompted") == "1":
             return
         answer = QMessageBox.question(
-            window, "让 ClassFix 随 Windows 启动？",
-            "ClassFix 需要常驻后台监视 PowerPoint。是否为当前用户启用开机自启？\n\n"
+            window, "让 EveTech 随 Windows 启动？",
+            "EveTech 需要常驻后台监视 PowerPoint。是否为当前用户启用开机自启？\n\n"
             "之后可以在“设置”中随时关闭。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes)
@@ -428,7 +475,7 @@ def main():
                     window, "开机自启没有设置成功",
                     "创建自启快捷方式失败了（这台机器启动 PowerShell 较慢，或安全软件拦住了）。\n\n"
                     "可以稍后在“设置 → 常规”里再点一次「随 Windows 启动」；"
-                    "仍然不行的话，手动把 ClassFix.exe 的快捷方式放进"
+                    "仍然不行的话，手动把 EveTech.exe 的快捷方式放进"
                     "「开始菜单 → 启动」文件夹即可，效果一样。")
         window.save_settings({"startup_prompted": "1"})
         window.settings_values["startup_prompted"] = "1"
@@ -453,9 +500,9 @@ def main():
             remember()
             if not isinstance(manifest, dict) or not manifest.get("available"):
                 return
-            text = "ClassFix %s 已发布（当前 %s），可在“设置 → 软件更新”安装。" % (manifest["version"], VERSION)
+            text = "EveTech %s 已发布（当前 %s），可在“设置 → 软件更新”安装。" % (manifest["version"], VERSION)
             if window.tray is not None:
-                window.tray.showMessage("ClassFix 有更新", text, QSystemTrayIcon.MessageIcon.Information, 8000)
+                window.tray.showMessage("EveTech 有更新", text, QSystemTrayIcon.MessageIcon.Information, 8000)
             window.statusBar().showMessage(text, 20000)
 
         run_job(fetch_manifest, ready, lambda _name: remember())
@@ -467,7 +514,7 @@ def main():
             return
         window.statusBar().showMessage(message, 30000)
         if window.tray is not None:
-            window.tray.showMessage("ClassFix 上次更新未完成", message,
+            window.tray.showMessage("EveTech 上次更新未完成", message,
                                     QSystemTrayIcon.MessageIcon.Warning, 15000)
 
     if not background:

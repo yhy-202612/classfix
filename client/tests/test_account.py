@@ -5,9 +5,9 @@ import unittest
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
-from classfix import cloud
-from classfix.ui.account import AccountBar, AccountDialog, masked_phone, valid_phone
-from classfix.ui.theme import apply_theme
+from evetech import cloud
+from evetech.ui.account import AccountBar, AccountDialog, masked_phone, valid_phone
+from evetech.ui.theme import apply_theme
 
 
 def luminance(color):

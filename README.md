@@ -1,10 +1,11 @@
-# ClassFix
+# EveTech（原 ClassFix）
 
 教室电脑排障助手（Classroom Troubleshooting Assistant）· 面向教师与电教委员的 Windows 原生桌面工具。首版聚焦「课件里的视频放不出来」这一类课堂高频故障：自动检查 PPTX Open XML 与媒体引用、读出 PowerPoint 自己的报错原文、检查系统音量与静音、抓 Windows 事件日志，最后给一份**分层诊断**，每条证据明确标注「已确认 / 未取得」。
 
 - 官网/下载页：https://aiclass.openplays.cn/classfix/
 - EEO 风格测试页：https://aiclass.openplays.cn/classfix-eeo/
-- 当前版本：**1.6.3**（客户端 / 下载页 / 云端服务三方版本号一致）
+- 客户端源码版本：**1.6.8**
+- 官网下载清单版本：**1.6.3**
 
 ## 目录结构
 
@@ -17,11 +18,11 @@ server/      云端服务 classfix-api（零依赖 Node：诊断代理 + 积分/
 
 ## client/ —— 客户端
 
-- 入口 `main.py`，主包 `classfix/`，第三方探针 `desktop_goose/`，测试 `tests/`，辅助脚本 `tools/`。
-- 构建：`build-exe.ps1`（PyInstaller，产物为 `ClassFix.exe` + `_internal`，免安装、无需管理员权限）。
+- 入口 `main.py`，主包 `evetech/`，桌宠助手 `desktop_goose/`，测试 `tests/`，辅助脚本 `tools/`。
+- 构建：`build-exe.ps1`（PyInstaller，产物为 `EveTech.exe` + `_internal`，免安装、无需管理员权限）。
 - 依赖：`requirements.txt`（运行）、`requirements-build.txt`（构建）。
-- 详细说明见 `client/README.md`，版本变更见 `client/release-notes-*.md`。
-- 许可与第三方组件名单见 `client/THIRD-PARTY.md`（含 GPLv3 全文要求：捆绑的 ffprobe 是 GPLv3-or-later）。
+- 使用说明、构建步骤和当前版本变更见 [客户端 README](client/README.md)。
+- 许可与第三方组件名单见 [THIRD-PARTY.md](client/THIRD-PARTY.md)。当前客户端构建所用 FFprobe 的分发许可随所选构建确定。
 
 ## site/ 与 site-eeo/ —— 下载页
 
@@ -53,5 +54,6 @@ server/      云端服务 classfix-api（零依赖 Node：诊断代理 + 积分/
 
 | 版本 | 要点 |
 |---|---|
+| 1.6.8 | 客户端更名为 EveTech，加入截图圈画问答、放映入窝、桌鹅预览和可见性诊断 |
 | 1.6.3 | 播放失败分层诊断（PPTX/媒体、音量、放映状态、PowerPoint 报错原文与 COM、Windows 事件日志）、提示框显示报错原文、内存紧张提醒 + 一键优化、多提示不互相遮挡、打开验证只关自己的副本 |
 | 1.5.0 | 见 `client/release-notes-1.5.0.md` |

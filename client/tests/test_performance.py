@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from PySide6.QtCore import QCoreApplication
 
-from classfix.performance import MIB, MemoryPressure
+from evetech.performance import MIB, MemoryPressure
 
 
 class MemoryPressureTest(unittest.TestCase):
@@ -21,7 +21,7 @@ class MemoryPressureTest(unittest.TestCase):
         usual = SimpleNamespace(percent=78, available=1024 * MIB)
         high_percent = SimpleNamespace(percent=86, available=1000 * MIB)
         low_available = SimpleNamespace(percent=82, available=690 * MIB)
-        with patch("classfix.performance.psutil.virtual_memory",
+        with patch("evetech.performance.psutil.virtual_memory",
                    side_effect=[high_percent, usual, low_available, high_percent]):
             for _ in range(3):
                 watcher.poll()
@@ -31,6 +31,6 @@ class MemoryPressureTest(unittest.TestCase):
 
     def test_disabled_setting_avoids_sampling(self):
         watcher = MemoryPressure(lambda: False)
-        with patch("classfix.performance.psutil.virtual_memory") as sample:
+        with patch("evetech.performance.psutil.virtual_memory") as sample:
             watcher.poll()
         sample.assert_not_called()

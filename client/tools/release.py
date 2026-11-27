@@ -1,12 +1,12 @@
 """把打包目录做成可发布的更新包：zip + SHA256 + update.json。
 
-用法（在 Windows 打完 dist\\ClassFix 之后，任何平台都能跑这一步）：
+用法（在 Windows 打完 dist\\EveTech 之后，任何平台都能跑这一步）：
 
-    python tools/release.py --source dist/ClassFix --output release \
+    python tools/release.py --source dist/EveTech --output release \
         --notes release-notes.md --base-url https://aiclass.openplays.cn/classfix/
 
 产出：
-    release/ClassFix-<版本>-Windows-x64.zip     发给用户 / 上传到站点
+    release/EveTech-<版本>-Windows-x64.zip     发给用户 / 上传到站点
     release/update.json                        站点根目录的更新清单
     release/sha256.txt                         便于人工核对
 """
@@ -23,8 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from classfix import VERSION  # noqa: E402
-from classfix.update import PACKAGE_META  # noqa: E402
+from evetech import VERSION  # noqa: E402
+from evetech.update import PACKAGE_META  # noqa: E402
 from tools.write_package_meta import write_meta  # noqa: E402
 
 EXCLUDED_DIRS = {"__pycache__", ".pytest_cache"}
@@ -57,23 +57,23 @@ def read_notes(path):
 def build_zip(source, archive):
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
         for path in iter_files(source):
-            bundle.write(path, Path("ClassFix") / path.relative_to(source))
+            bundle.write(path, Path("EveTech") / path.relative_to(source))
     return archive
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="生成 ClassFix 更新包与清单")
-    parser.add_argument("--source", required=True, help="PyInstaller 输出的 dist/ClassFix 目录")
+    parser = argparse.ArgumentParser(description="生成 EveTech 更新包与清单")
+    parser.add_argument("--source", required=True, help="PyInstaller 输出的 dist/EveTech 目录")
     parser.add_argument("--output", default=str(ROOT / "release"), help="产物目录")
     parser.add_argument("--notes", default="", help="更新说明文件（markdown / 纯文本，每行一条）")
     parser.add_argument("--base-url", default="https://aiclass.openplays.cn/classfix/",
                         help="包上传后的公开目录（决定 update.json 里的下载地址）")
-    parser.add_argument("--version", default=VERSION, help="覆盖清单版本号（默认取 classfix.VERSION）")
+    parser.add_argument("--version", default=VERSION, help="覆盖清单版本号（默认取 evetech.VERSION）")
     args = parser.parse_args(argv)
 
     source = Path(args.source).resolve()
-    if not (source / "ClassFix.exe").is_file():
-        print("找不到 %s，请先运行 build-exe.ps1 打包。" % (source / "ClassFix.exe"))
+    if not (source / "EveTech.exe").is_file():
+        print("找不到 %s，请先运行 build-exe.ps1 打包。" % (source / "EveTech.exe"))
         return 2
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,7 @@ def main(argv=None):
         print("提示：清单版本 %s 与源码 VERSION %s 不一致，包内元数据仍写 %s。" % (args.version, VERSION, VERSION))
     notes = read_notes(args.notes)
     write_meta(source, "\n".join(notes))
-    archive = output / ("ClassFix-%s-Windows-x64.zip" % args.version)
+    archive = output / ("EveTech-%s-Windows-x64.zip" % args.version)
     if archive.exists():
         archive.unlink()
     build_zip(source, archive)

@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from classfix.model import Finding, Report, SYMPTOMS
-from classfix import opencheck as oc
+from evetech.model import Finding, Report, SYMPTOMS
+from evetech import opencheck as oc
 
 
 class ClassifyMessageTest(unittest.TestCase):
@@ -385,7 +385,7 @@ class InspectOpenTest(unittest.TestCase):
 
     @mock.patch.object(oc, "com_probe", return_value=oc.ComResult(state="failed"))
     def test_open_report_reaches_ai_with_its_own_context(self, _probe):
-        from classfix import ai
+        from evetech import ai
         with tempfile.TemporaryDirectory() as folder:
             deck = Path(folder) / "a.pptx"
             deck.write_bytes(b"PK\x03\x04 deck")
@@ -397,7 +397,7 @@ class InspectOpenTest(unittest.TestCase):
         self.assertEqual(keys, ["open_com", "open_env", "open_safe", "open_integrity"])
 
     def test_early_exit_reports_still_carry_open_context(self):
-        from classfix import ai
+        from evetech import ai
         for path in ("/tmp/x.doc", "/nonexistent/课件.pptx"):
             payload = ai.evidence(oc.inspect_open(path), "none", "none")
             with self.subTest(path=path):
@@ -517,8 +517,8 @@ class SafeModeTargetTest(unittest.TestCase):
 
     def test_wps_com_server_is_rejected(self):
         with mock.patch.object(oc.sys, "platform", "win32"), \
-                mock.patch("classfix.preflight.powerpnt_path", return_value=None), \
-                mock.patch("classfix.preflight.com_server_path",
+                mock.patch("evetech.preflight.powerpnt_path", return_value=None), \
+                mock.patch("evetech.preflight.com_server_path",
                            return_value=Path("C:/Kingsoft/WPS Office/office6/wps.exe")):
             self.assertEqual(oc.powerpoint_exe(), "")
 
@@ -528,8 +528,8 @@ class SafeModeTargetTest(unittest.TestCase):
             other = Path(folder) / "SomeTool.exe"
             other.write_bytes(b"MZ")
             with mock.patch.object(oc.sys, "platform", "win32"), \
-                    mock.patch("classfix.preflight.powerpnt_path", return_value=None), \
-                    mock.patch("classfix.preflight.com_server_path", return_value=other):
+                    mock.patch("evetech.preflight.powerpnt_path", return_value=None), \
+                    mock.patch("evetech.preflight.com_server_path", return_value=other):
                 self.assertEqual(oc.powerpoint_exe(), "")
 
     def test_wps_substring_in_a_real_office_path_is_not_wps(self):
@@ -543,8 +543,8 @@ class SafeModeTargetTest(unittest.TestCase):
             target = Path(folder) / "POWERPNT.EXE"
             target.write_bytes(b"MZ")
             with mock.patch.object(oc.sys, "platform", "win32"), \
-                    mock.patch("classfix.preflight.powerpnt_path", return_value=target), \
-                    mock.patch("classfix.preflight.com_server_path", return_value=None):
+                    mock.patch("evetech.preflight.powerpnt_path", return_value=target), \
+                    mock.patch("evetech.preflight.com_server_path", return_value=None):
                 self.assertEqual(oc.powerpoint_exe(), str(target))
 
     def test_only_wps_skips_instead_of_waiting(self):

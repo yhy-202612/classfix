@@ -5,10 +5,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from classfix.preflight import (DisplayPath, _looks_like_wps, describe_layout, display_check,
+from evetech.preflight import (DisplayPath, _looks_like_wps, describe_layout, display_check,
                                 inspect_preflight, network_check, office_check, powerpnt_path,
                                 peripheral_check)
-from classfix.pnp import Peripheral
+from evetech.pnp import Peripheral
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows device integration")
@@ -24,11 +24,11 @@ class PreflightTest(unittest.TestCase):
 
     def test_windows_network_states_are_distinct(self):
         for bits, status in ((None, "unknown"), (0, "problem"), (32, "warning"), (64, "ok")):
-            with patch("classfix.preflight.network_bits", return_value=bits):
+            with patch("evetech.preflight.network_bits", return_value=bits):
                 self.assertEqual(network_check().status, status)
 
     def test_unknown_camera_status_is_not_reported_as_healthy(self):
-        with patch("classfix.preflight.present_peripherals", return_value=[Peripheral("Camera", None, False)]):
+        with patch("evetech.preflight.present_peripherals", return_value=[Peripheral("Camera", None, False)]):
             self.assertEqual(peripheral_check().status, "warning")
 
     def test_real_display_has_explanation(self):
@@ -48,7 +48,7 @@ class OfficeDetectionTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.addCleanup(patch.stopall)
-        self.enterContext(patch.dict("classfix.preflight.os.environ", {
+        self.enterContext(patch.dict("evetech.preflight.os.environ", {
             name: self.tmp.name
             for name in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432")
         }))
@@ -60,10 +60,10 @@ class OfficeDetectionTest(unittest.TestCase):
 
     def test_registry_entry_pointing_to_wps_is_not_powerpoint(self):
         wps = self._touch("wps.exe")
-        patch("classfix.preflight._app_paths_value", return_value=wps).start()
-        patch("classfix.preflight.office_alternative", return_value=wps).start()
-        patch("classfix.preflight.psutil.process_iter", return_value=[]).start()
-        patch("classfix.preflight.com_server_path", return_value=None).start()
+        patch("evetech.preflight._app_paths_value", return_value=wps).start()
+        patch("evetech.preflight.office_alternative", return_value=wps).start()
+        patch("evetech.preflight.psutil.process_iter", return_value=[]).start()
+        patch("evetech.preflight.com_server_path", return_value=None).start()
         self.assertIsNone(powerpnt_path())
         check = office_check()
         # 只装 WPS 的机器不再判为「故障」：WPS 也能正常放映课件，只是自动监视不可用
@@ -73,17 +73,17 @@ class OfficeDetectionTest(unittest.TestCase):
 
     def test_real_powerpnt_registration_is_reported_ok(self):
         real = self._touch("POWERPNT.EXE")
-        patch("classfix.preflight._app_paths_value", return_value=real).start()
-        patch("classfix.preflight.psutil.process_iter", return_value=[]).start()
-        patch("classfix.preflight.com_server_path", return_value=real).start()
+        patch("evetech.preflight._app_paths_value", return_value=real).start()
+        patch("evetech.preflight.psutil.process_iter", return_value=[]).start()
+        patch("evetech.preflight.com_server_path", return_value=real).start()
         self.assertEqual(powerpnt_path(), real)
         self.assertEqual(office_check().status, "ok")
 
     def test_installed_powerpoint_without_com_registration_is_warning(self):
         real = self._touch("POWERPNT.EXE")
-        patch("classfix.preflight._app_paths_value", return_value=real).start()
-        patch("classfix.preflight.psutil.process_iter", return_value=[]).start()
-        patch("classfix.preflight.com_server_path", return_value=None).start()
+        patch("evetech.preflight._app_paths_value", return_value=real).start()
+        patch("evetech.preflight.psutil.process_iter", return_value=[]).start()
+        patch("evetech.preflight.com_server_path", return_value=None).start()
         check = office_check()
         self.assertEqual(check.status, "warning")
         self.assertIn("COM", check.detail)
@@ -91,34 +91,34 @@ class OfficeDetectionTest(unittest.TestCase):
     def test_com_registration_hijacked_by_other_server_is_problem(self):
         real = self._touch("POWERPNT.EXE")
         hijack = self._touch("wps.exe")
-        patch("classfix.preflight._app_paths_value", return_value=real).start()
-        patch("classfix.preflight.psutil.process_iter", return_value=[]).start()
-        patch("classfix.preflight.com_server_path", return_value=hijack).start()
+        patch("evetech.preflight._app_paths_value", return_value=real).start()
+        patch("evetech.preflight.psutil.process_iter", return_value=[]).start()
+        patch("evetech.preflight.com_server_path", return_value=hijack).start()
         check = office_check()
         self.assertEqual(check.status, "problem")
         self.assertIn("wps.exe", check.detail)
 
     def test_running_powerpoint_process_is_ok_without_install_path(self):
-        patch("classfix.preflight._app_paths_value", return_value=None).start()
-        patch("classfix.preflight.office_alternative", return_value=None).start()
-        patch("classfix.preflight.com_server_path", return_value=None).start()
-        patch("classfix.preflight.psutil.process_iter",
+        patch("evetech.preflight._app_paths_value", return_value=None).start()
+        patch("evetech.preflight.office_alternative", return_value=None).start()
+        patch("evetech.preflight.com_server_path", return_value=None).start()
+        patch("evetech.preflight.psutil.process_iter",
               return_value=[SimpleNamespace(info={"name": "POWERPNT.EXE"})]).start()
         self.assertEqual(office_check().status, "ok")
 
     def test_missing_office_reports_problem_then_explains_alternative(self):
         wps = self._touch("wpp.exe")
-        patch("classfix.preflight._app_paths_value", return_value=None).start()
-        patch("classfix.preflight.office_alternative", return_value=wps).start()
-        patch("classfix.preflight.psutil.process_iter", return_value=[]).start()
-        patch("classfix.preflight.com_server_path", return_value=None).start()
+        patch("evetech.preflight._app_paths_value", return_value=None).start()
+        patch("evetech.preflight.office_alternative", return_value=wps).start()
+        patch("evetech.preflight.psutil.process_iter", return_value=[]).start()
+        patch("evetech.preflight.com_server_path", return_value=None).start()
         check = office_check()
         # 只装 WPS 的机器判为「需要注意」而不是「存在问题」，具体能力说明见 wps_check()
         self.assertEqual(check.status, "warning")
         self.assertIn("WPS", check.detail)
 
     def test_local_server_command_line_is_parsed(self):
-        from classfix.preflight import _server_executable
+        from evetech.preflight import _server_executable
         self.assertEqual(_server_executable('"C:\\Program Files\\Microsoft Office\\Root\\Office16\\POWERPNT.EXE" /automation'),
                          Path("C:\\Program Files\\Microsoft Office\\Root\\Office16\\POWERPNT.EXE"))
         self.assertEqual(_server_executable("C:\\Office\\POWERPNT.EXE /automation"),
@@ -161,8 +161,8 @@ class DisplayLayoutTest(unittest.TestCase):
         self.assertEqual(len(idle), 1)
 
     def test_connected_but_not_projected_is_reported_as_problem(self):
-        with patch("classfix.preflight.sys.platform", "win32"), \
-             patch("classfix.preflight.read_display_paths", return_value=[
+        with patch("evetech.preflight.sys.platform", "win32"), \
+             patch("evetech.preflight.read_display_paths", return_value=[
                  self.path("内置屏", "内置", True, True, 1),
                  self.path("DELL U2417H", "DisplayPort", False, False, 2)]):
             check = display_check()
@@ -171,8 +171,8 @@ class DisplayLayoutTest(unittest.TestCase):
         self.assertIn("Win+P", check.detail)
 
     def test_projected_layout_is_ok(self):
-        with patch("classfix.preflight.sys.platform", "win32"), \
-             patch("classfix.preflight.read_display_paths", return_value=[
+        with patch("evetech.preflight.sys.platform", "win32"), \
+             patch("evetech.preflight.read_display_paths", return_value=[
                  self.path("内置屏", "内置", True, True, 1),
                  self.path("投影", "HDMI", True, False, 1)]):
             check = display_check()
@@ -180,8 +180,8 @@ class DisplayLayoutTest(unittest.TestCase):
         self.assertIn("复制", check.detail)
 
     def test_unreadable_display_config_stays_unknown(self):
-        with patch("classfix.preflight.sys.platform", "win32"), \
-             patch("classfix.preflight.read_display_paths", return_value=None):
+        with patch("evetech.preflight.sys.platform", "win32"), \
+             patch("evetech.preflight.read_display_paths", return_value=None):
             self.assertEqual(display_check().status, "unknown")
 
     def test_ghost_targets_are_not_counted_as_connected(self):
@@ -197,8 +197,8 @@ class DisplayLayoutTest(unittest.TestCase):
         self.assertEqual(mode, "仅第二屏幕")
         self.assertEqual(len(external), 1)
         self.assertEqual(idle, [])
-        with patch("classfix.preflight.sys.platform", "win32"), \
-             patch("classfix.preflight.read_display_paths", return_value=paths):
+        with patch("evetech.preflight.sys.platform", "win32"), \
+             patch("evetech.preflight.read_display_paths", return_value=paths):
             check = display_check()
         self.assertEqual(check.status, "warning")
         self.assertNotIn("个外接输出已连接", check.detail)
@@ -209,8 +209,8 @@ class DisplayLayoutTest(unittest.TestCase):
         paths = [self.path("内置屏", "内置", True, True, 1),
                  self.path("教室投影", "HDMI", False, False, 2),
                  self.path("显示目标 265988", "DisplayPort", False, False, 0, available=False)]
-        with patch("classfix.preflight.sys.platform", "win32"), \
-             patch("classfix.preflight.read_display_paths", return_value=paths):
+        with patch("evetech.preflight.sys.platform", "win32"), \
+             patch("evetech.preflight.read_display_paths", return_value=paths):
             check = display_check()
         self.assertEqual(check.status, "problem")
         self.assertIn("1 个外接输出已连接", check.detail)

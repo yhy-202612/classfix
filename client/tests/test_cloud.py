@@ -3,7 +3,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from classfix import cloud
+from evetech import cloud
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -86,7 +86,7 @@ class CloudTest(unittest.TestCase):
 
     def test_plain_http_cloud_address_is_rejected(self):
         with self.assertRaises(cloud.CloudError):
-            cloud.check_base("http://example.com/classfix-api")
+            cloud.check_base("http://example.com/evetech-api")
         self.assertEqual(cloud.check_base(self.base + "/"), self.base)
 
     def test_login_stores_token_and_points(self):

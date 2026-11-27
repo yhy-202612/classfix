@@ -22,7 +22,7 @@ from pathlib import Path
 from .model import Check, Finding, Report, sort_findings
 
 OPEN_STATES = {"ok": "正常", "opened": "已打开", "failed": "失败", "skipped": "未检测", "timeout": "超时"}
-PROBE_PREFIX = "classfix-open-"
+PROBE_PREFIX = "evetech-open-"
 POWERPOINT_IMAGE = "POWERPNT.EXE"
 
 # 抓到即视为「失败类提示」的文本特征；DialogWatcher 与 verdict 共用同一份，避免两套口径
@@ -55,7 +55,7 @@ MESSAGE_FAMILIES = (
     (r"字体|font",
      "课件用到了本机没有的字体", "装好缺失字体，或在 PowerPoint 里「替换字体」；这只影响版式，不影响能否打开。", "可能", 20),
     (r"链接|缺少文件|missing file|无法找到",
-     "课件里引用的外部文件找不到", "把缺失的视频/图片放回原路径，或用 ClassFix 的「替身」功能重新指向文件。", "有检测依据", 14),
+     "课件里引用的外部文件找不到", "把缺失的视频/图片放回原路径，或用 EveTech 的「替身」功能重新指向文件。", "有检测依据", 14),
 )
 
 HRESULT_HINTS = {
@@ -258,7 +258,7 @@ def verdict(com, safe, env):
         return None            # 工具自身缺组件，不能据此推断课件好坏
     if com.state == "aborted":
         return ("检测没能开始：课件副本都复制不出来",
-                "ClassFix 会先把课件复制到临时目录再交给 PowerPoint，这一步失败了，"
+                "EveTech 会先把课件复制到临时目录再交给 PowerPoint，这一步失败了，"
                 "所以「PowerPoint 打不开」这个结论并不成立。",
                 "有检测依据", 8)
     if com.state == "timeout":
@@ -942,7 +942,7 @@ def _com_check(com):
         return Check("open_com", "PowerPoint 实际打开测试", "unknown", com.message or "尚未检测。")
     if com.state == "blocked":
         return Check("open_com", "PowerPoint 实际打开测试", "unknown",
-                     "%s。这不是课件的问题，请重装或更新 ClassFix 后再检测。" % com.message)
+                     "%s。这不是课件的问题，请重装或更新 EveTech 后再检测。" % com.message)
     if com.state == "aborted":
         return Check("open_com", "PowerPoint 实际打开测试", "unknown",
                      "检测没能开始：%s（这不是 PowerPoint 的判断，请先解决复制失败的原因）" % com.message)
@@ -1008,7 +1008,7 @@ def _safe_check(safe_result, com):
     if safe_result.state == "skipped":
         if com.state == "blocked":
             return Check("open_safe", "安全模式对比", "unknown",
-                         "检测组件缺失，本次未做安全模式对比（先修好 ClassFix 的组件再检测）。")
+                         "检测组件缺失，本次未做安全模式对比（先修好 EveTech 的组件再检测）。")
         note = safe_result.dialog or "本次未做安全模式对比。"
         if com.state == "ok":
             if note == "本次未做安全模式对比。":
@@ -1044,7 +1044,7 @@ def _findings(com, safe_result, environment, fresh=()):
     if blocked:
         # 真机实测（CF-002）：缺 pywin32 时若报成「打开失败」，会把好课件判成坏课件
         items.append(Finding("检测组件缺失，本次没能验证课件", com.message,
-                             "这不是课件的问题：重装或更新 ClassFix（缺少 pywin32 组件）后再检测。",
+                             "这不是课件的问题：重装或更新 EveTech（缺少 pywin32 组件）后再检测。",
                              "有检测依据", 3))
     combined = None if blocked else verdict(com, safe_result, environment)
     headline = combined[0] if combined else ""
@@ -1101,13 +1101,13 @@ def _findings(com, safe_result, environment, fresh=()):
         items.append(Finding("最近一次 PowerPoint 崩溃发生在 %s" % crash.get("time", ""),
                              "崩溃模块 %s，异常码 %s（历史记录，与本次检测无关）。"
                              % (crash.get("module") or "未知", crash.get("code") or "未知"),
-                             ("先修好 ClassFix 的组件，再看这一条：" if blocked else "")
+                             ("先修好 EveTech 的组件，再看这一条：" if blocked else "")
                              + "对照崩溃模块判断是加载项还是显卡驱动；先做一次 Office「快速修复」。",
                              "有检测依据", 11))
     if environment.disabled and not fresh:
         items.append(Finding("PowerPoint 曾禁用加载项",
                              "禁用记录：%s" % "；".join(environment.disabled[:3]),
-                             ("先修好 ClassFix 的组件，再看这一条：" if blocked else "")
+                             ("先修好 EveTech 的组件，再看这一条：" if blocked else "")
                              + "在「文件 → 选项 → 加载项」里逐个启用排查，找出会让课件打不开的那个。",
                              "有检测依据", 12))
     if not items and com.state == "ok":

@@ -342,7 +342,7 @@ def probe_verdict(vendor, version, run_ok, note=""):
                           "自动放映监视同样可用。" % version)
         if vendor == "wps":
             return True, ("放映接口可用（WPS 演示 %s）：刚刚实测能正常启动放映，课件用 WPS 放映没问题。\n\n"
-                          "WPS 没有提供 PowerPoint 的放映窗口接口，ClassFix 读不到当前页码与音量提示，"
+                          "WPS 没有提供 PowerPoint 的放映窗口接口，EveTech 读不到当前页码与音量提示，"
                           "放映时请用「人工确认画面」。" % version)
         return True, "放映接口可用（%s）：刚刚实测能正常启动放映。" % (version or "未登记的程序")
     if vendor == "powerpoint":
@@ -351,7 +351,7 @@ def probe_verdict(vendor, version, run_ok, note=""):
     if vendor == "wps":
         return False, ("本机的放映接口由 WPS 接管（版本 %s），但实测没能启动放映（%s）。\n\n"
                        "请打开 WPS 演示手动放映一次：手动能放就说明只是自动化调用受限，"
-                       "课件照常放映、ClassFix 按「人工确认画面」使用即可；手动也放不出来则请修复 WPS。" % (version, note))
+                       "课件照常放映、EveTech 按「人工确认画面」使用即可；手动也放不出来则请修复 WPS。" % (version, note))
     return False, ("自动化接口由未登记的程序提供（版本 %s），实测没能启动放映（%s）。"
                    "请安装 Microsoft PowerPoint 或 WPS 演示后重试。" % (version or "读不到", note))
 
@@ -559,7 +559,7 @@ def powerpoint_check():
     if alternative is not None:
         return Check("office", title, "warning",
                      "未安装 Microsoft PowerPoint（本机由 %s 占用了 POWERPNT.EXE 入口，通常是 WPS 演示）。"
-                     "课件用 WPS 一样能放；但 ClassFix 的放映监视依赖 PowerPoint 接口，"
+                     "课件用 WPS 一样能放；但 EveTech 的放映监视依赖 PowerPoint 接口，"
                      "用 WPS 放映时请按「人工确认画面」处理。" % alternative.name)
     return Check("office", title, "problem",
                  "未找到 Microsoft PowerPoint，也没有读到放映接口登记。放映监视不可用。")
@@ -585,7 +585,7 @@ def wps_check():
     detail.append("路径 %s" % path)
     detail.append("当前正在运行" if running else "当前未运行")
     if hijack is not None:
-        detail.append("注意：PowerPoint 放映接口由 WPS 接管（%s），ClassFix 的自动放映监视在 WPS 下不可用，"
+        detail.append("注意：PowerPoint 放映接口由 WPS 接管（%s），EveTech 的自动放映监视在 WPS 下不可用，"
                       "请用「人工确认画面」代替。" % hijack.name)
     else:
         detail.append("WPS 可以正常打开 .pptx；放映监视仍以 Microsoft PowerPoint 为准。")
@@ -645,7 +645,7 @@ def inspect_preflight(_feedback="pending"):
     elif office.status == "warning":
         if wps.status != "unknown":
             findings.append(Finding("放映监视只支持 Microsoft PowerPoint", office.detail,
-                                    "课件用 WPS 演示也能正常放映，只是 ClassFix 读不到页码与音量提示；"
+                                    "课件用 WPS 演示也能正常放映，只是 EveTech 读不到页码与音量提示；"
                                     "需要自动监视时装 Microsoft PowerPoint，或按人工确认放映画面。",
                                     "已检测", 25))
         else:

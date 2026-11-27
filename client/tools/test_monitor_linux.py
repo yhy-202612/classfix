@@ -22,7 +22,7 @@ try:
 except ImportError:  # pragma: no cover - 仅在缺依赖时触发
     sys.exit("需要先安装 PySide6-Essentials：pip install PySide6-Essentials")
 
-import classfix.monitor as monitor  # noqa: E402
+import evetech.monitor as monitor  # noqa: E402
 
 monitor.read_system_volume = lambda: (60, False)
 

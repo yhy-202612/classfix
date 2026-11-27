@@ -11,8 +11,8 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from classfix import VERSION
-from classfix.update import (PACKAGE_META, UpdateError, check_url, cleanup_scripts, download,
+from evetech import VERSION
+from evetech.update import (PACKAGE_META, UpdateError, check_url, cleanup_scripts, download,
                              fetch_manifest, install_root, is_newer, last_update_failure,
                              launch_updater, local_package_info, package_root, parse_manifest,
                              sha256_of, stage, stale_scripts, unpack, updater_script, version_tuple)
@@ -20,7 +20,7 @@ from classfix.update import (PACKAGE_META, UpdateError, check_url, cleanup_scrip
 _parts = (version_tuple(VERSION) + (0, 0, 0))[:3]
 # 测试里要验证「有新版可装」，而 VERSION 会随发版变化，这里派生一个永远更高的版本号
 NEW = "%d.%d.%d" % (_parts[0], _parts[1], _parts[2] + 1)
-PAYLOAD = b"classfix-test-payload" * 4096
+PAYLOAD = b"evetech-test-payload" * 4096
 DIGEST = hashlib.sha256(PAYLOAD).hexdigest()
 
 
@@ -45,7 +45,7 @@ class VersionTests(unittest.TestCase):
 
 class ManifestTests(unittest.TestCase):
     def payload(self, **overrides):
-        data = {"version": NEW, "url": "https://aiclass.openplays.cn/classfix/ClassFix-%s.zip" % NEW,
+        data = {"version": NEW, "url": "https://aiclass.openplays.cn/classfix/EveTech-%s.zip" % NEW,
                 "sha256": DIGEST, "size": len(PAYLOAD), "notes": ["第一条", "第二条"]}
         data.update(overrides)
         return json.dumps(data, ensure_ascii=False)
@@ -178,12 +178,12 @@ class PackageTests(unittest.TestCase):
 
     def test_unpack_and_root(self):
         archive = build_zip(self.root / "p.zip", {
-            "ClassFix/ClassFix.exe": b"exe",
-            "ClassFix/_internal/lib.dll": b"dll",
+            "EveTech/EveTech.exe": b"exe",
+            "EveTech/_internal/lib.dll": b"dll",
         })
         target = unpack(archive, self.root / "out")
-        self.assertTrue((target / "ClassFix" / "_internal" / "lib.dll").is_file())
-        self.assertEqual(package_root(target), target / "ClassFix")
+        self.assertTrue((target / "EveTech" / "_internal" / "lib.dll").is_file())
+        self.assertEqual(package_root(target), target / "EveTech")
 
     def test_unpack_rejects_traversal(self):
         archive = build_zip(self.root / "bad.zip", {"../evil.txt": b"x"})
@@ -198,7 +198,7 @@ class PackageTests(unittest.TestCase):
     def test_unpack_rejects_symlink(self):
         archive = self.root / "link.zip"
         with zipfile.ZipFile(archive, "w") as handle:
-            info = zipfile.ZipInfo("ClassFix/link")
+            info = zipfile.ZipInfo("EveTech/link")
             info.external_attr = (0o120777 << 16)
             handle.writestr(info, "target")
         with self.assertRaises(UpdateError):
@@ -210,9 +210,9 @@ class PackageTests(unittest.TestCase):
         self.assertIsNone(package_root(target))
 
     def test_local_package_info(self):
-        archive = build_zip(self.root / ("ClassFix-%s-Windows-x64.zip" % NEW), {
+        archive = build_zip(self.root / ("EveTech-%s-Windows-x64.zip" % NEW), {
             PACKAGE_META: json.dumps({"version": NEW, "notes": "离线包"}, ensure_ascii=False).encode(),
-            "ClassFix/ClassFix.exe": b"exe",
+            "EveTech/EveTech.exe": b"exe",
         })
         info = local_package_info(archive)
         self.assertEqual(info["version"], NEW)
@@ -220,27 +220,27 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(info["sha256"], sha256_of(archive))
 
     def test_local_package_version_from_name(self):
-        archive = build_zip(self.root / "ClassFix-1.3.1-Windows-x64.zip", {"ClassFix/ClassFix.exe": b"exe"})
+        archive = build_zip(self.root / "EveTech-1.3.1-Windows-x64.zip", {"EveTech/EveTech.exe": b"exe"})
         self.assertEqual(local_package_info(archive)["version"], "1.3.1")
 
     def test_stage_writes_script(self):
-        archive = build_zip(self.root / "ClassFix-1.2.0.zip", {"ClassFix/ClassFix.exe": b"exe"})
-        install = self.root / "ClassFix"
+        archive = build_zip(self.root / "EveTech-1.2.0.zip", {"EveTech/EveTech.exe": b"exe"})
+        install = self.root / "EveTech"
         install.mkdir()
         inner, script = stage(archive, NEW, root=install)
-        self.assertTrue((inner / "ClassFix.exe").is_file())
+        self.assertTrue((inner / "EveTech.exe").is_file())
         self.assertTrue(script.is_file())
         self.assertEqual(script.parent, self.root)
 
     def test_updater_script_content(self):
-        script = updater_script(r"C:\Games\ClassFix.update", r"C:\Games\ClassFix",
+        script = updater_script(r"C:\Games\EveTech.update", r"C:\Games\EveTech",
                                 self.root / "up.bat", log=self.root / "up.log")
         text = script.read_text(encoding="utf-8")
         self.assertIn("robocopy", text)
         self.assertIn("/E", text)
         self.assertIn("tasklist", text)
         self.assertIn('start "" /D "%DST%" "%DST%\\%EXE%"', text)
-        self.assertIn('set "DST=C:\\Games\\ClassFix"', text)
+        self.assertIn('set "DST=C:\\Games\\EveTech"', text)
         self.assertIn("(goto) 2>nul & del", text)
         self.assertIn(b"\r\n", script.read_bytes())   # 批处理必须是 CRLF（按字节判断，read_text 会规范化换行）
         self.assertIn("ping -n 2 127.0.0.1", text)
@@ -251,23 +251,23 @@ class PackageTests(unittest.TestCase):
 
         2026-11-18 的真实故障：1.3→1.4 自动更新一律中止，用户得手动双击 bat。
         """
-        script = updater_script(r"C:\Games\ClassFix.update", r"C:\Games\ClassFix",
+        script = updater_script(r"C:\Games\EveTech.update", r"C:\Games\EveTech",
                                 self.root / "up.bat", log=self.root / "up.log")
         text = script.read_text(encoding="utf-8")
         self.assertNotIn("timeout /t", text)
         self.assertIn("ping -n", text)
 
     def test_updater_script_checks_exe_before_restart(self):
-        script = updater_script(r"C:\Games\ClassFix.update", r"C:\Games\ClassFix",
+        script = updater_script(r"C:\Games\EveTech.update", r"C:\Games\EveTech",
                                 self.root / "up.bat", log=self.root / "up.log")
         text = script.read_text(encoding="utf-8")
         self.assertIn('if not exist "%DST%\\%EXE%"', text)
         self.assertLess(text.index("robocopy"), text.index('start "" /D'))
 
     def test_last_update_failure_reads_log_tail(self):
-        root = self.root / "ClassFix"
+        root = self.root / "EveTech"
         root.mkdir(exist_ok=True)
-        log = self.root / "ClassFix-update.log"
+        log = self.root / "EveTech-update.log"
         log.write_text("[x] update start\n[y] old process still running, update aborted\n", encoding="utf-8")
         message = last_update_failure(root, within_hours=48)
         self.assertIsNotNone(message)
@@ -289,10 +289,10 @@ class PackageTests(unittest.TestCase):
 
     def test_stale_scripts_are_cleaned(self):
         """残留替换脚本要能被找出来并删掉（否则用户会当成安装包双击）。"""
-        root = self.root / "ClassFix"
+        root = self.root / "EveTech"
         root.mkdir(exist_ok=True)
-        first = self.root / "ClassFix-update-1.4.0.bat"
-        second = self.root / "ClassFix-update-1.4.1.bat"
+        first = self.root / "EveTech-update-1.4.0.bat"
+        second = self.root / "EveTech-update-1.4.1.bat"
         for path in (first, second):
             path.write_text("@echo off\n", encoding="utf-8")
         self.assertEqual(len(stale_scripts(root)), 2)
@@ -302,7 +302,7 @@ class PackageTests(unittest.TestCase):
         self.assertFalse(second.exists())
 
     def test_install_root_in_source_mode(self):
-        self.assertTrue((install_root() / "classfix").is_dir())
+        self.assertTrue((install_root() / "evetech").is_dir())
 
 
 if __name__ == "__main__":

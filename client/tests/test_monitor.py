@@ -6,15 +6,15 @@ from unittest.mock import patch
 from PySide6.QtCore import Qt, QLockFile
 from PySide6.QtWidgets import QApplication
 
-from classfix.app import wire_monitor_popups
-from classfix.instance import SingleInstance
-from classfix.monitor import MediaProblem, PowerPointWatcher, inspect_presentation
-from classfix.pptx import Probe
-from classfix.startup import set_startup
+from evetech.app import wire_monitor_popups
+from evetech.instance import SingleInstance
+from evetech.monitor import MediaProblem, PowerPointWatcher, inspect_presentation
+from evetech.pptx import Probe
+from evetech.startup import set_startup
 from PySide6.QtTest import QTest
 
-from classfix.ui.overlay import FormatPopup, MediaAlerts, VolumePopup
-from classfix.ui.popup_stack import PopupStack
+from evetech.ui.overlay import FormatPopup, MediaAlerts, VolumePopup
+from evetech.ui.popup_stack import PopupStack
 from test_pptx import make_deck
 
 
@@ -65,7 +65,7 @@ class MonitorTest(unittest.TestCase):
         watcher, powerpoint = self.watcher_for_state(0)
         received = []
         watcher.low_volume.connect(lambda *items: received.append(items))
-        with patch("classfix.monitor.read_system_volume", return_value=(12, False)):
+        with patch("evetech.monitor.read_system_volume", return_value=(12, False)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(received, [(7, 12, False, 0)])
 
@@ -73,7 +73,7 @@ class MonitorTest(unittest.TestCase):
         watcher, powerpoint = self.watcher_for_state(3)
         received = []
         watcher.low_volume.connect(lambda *items: received.append(items))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(received, [(7, 0, True, 0)])
@@ -84,7 +84,7 @@ class MonitorTest(unittest.TestCase):
         powerpoint.SlideShowWindows.Item(1).View = UnavailablePlayerView(slide, 3)
         received = []
         watcher.low_volume.connect(lambda *items: received.append(items))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(received, [(7, 0, True, 0)])
 
@@ -95,7 +95,7 @@ class MonitorTest(unittest.TestCase):
         watcher._video_slides["c:/lesson.pptx"] = {7}
         received = []
         watcher.low_volume.connect(lambda *items: received.append(items))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(received, [(7, 0, True, 0)])
 
@@ -107,7 +107,7 @@ class MonitorTest(unittest.TestCase):
         showing, hides = [], []
         watcher.low_volume.connect(lambda *items: showing.append(items))
         watcher.playback_ok.connect(lambda: hides.append(1))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
             slide.Shapes = shapes
             watcher._inspect_slide_shows(powerpoint)
@@ -122,7 +122,7 @@ class MonitorTest(unittest.TestCase):
         volume = VolumePopup(self.app, stack)
         self.addCleanup(volume.close)
         wire_monitor_popups(watcher, alerts, volume)
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
         watcher._scan_finished("c:/lesson.pptx", (1, 1), (
             [MediaProblem(8, "外部视频链接失效", "找不到原始视频")], {7, 8}, {}))
@@ -143,7 +143,7 @@ class MonitorTest(unittest.TestCase):
         watcher, _ = self.watcher_for_state(3)
         received = []
         watcher.media_problem.connect(lambda problem, _location: received.append(problem))
-        with patch("classfix.monitor.read_powerpoint_media_errors", return_value=("无法播放媒体。",)):
+        with patch("evetech.monitor.read_powerpoint_media_errors", return_value=("无法播放媒体。",)):
             watcher._report_powerpoint_errors(0)
             watcher._report_powerpoint_errors(0)
         self.assertEqual(len(received), 1)
@@ -156,7 +156,7 @@ class MonitorTest(unittest.TestCase):
         watcher._video_slides["c:/lesson.pptx"] = {9}  # 视频在第 9 页，当前停在第 7 页
         received = []
         watcher.low_volume.connect(lambda *items: received.append(items))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(received, [])
 
@@ -166,7 +166,7 @@ class MonitorTest(unittest.TestCase):
         watcher._video_slides["d:/another-lesson.pptx"] = {3}  # 另一个课件有视频，但没在放映
         received = []
         watcher.low_volume.connect(lambda *items: received.append(items))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(received, [])
 
@@ -175,13 +175,13 @@ class MonitorTest(unittest.TestCase):
         received, hides = [], []
         watcher.low_volume.connect(lambda *items: received.append(items))
         watcher.playback_ok.connect(lambda: hides.append(1))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(len(received), 1)
         slide = powerpoint.SlideShowWindows.Item(1).View.Slide
         slide.Shapes = Collection()
         slide.SlideIndex = 8
-        with patch("classfix.monitor.read_system_volume", return_value=(60, False)):
+        with patch("evetech.monitor.read_system_volume", return_value=(60, False)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(len(hides), 1)
 
@@ -192,11 +192,11 @@ class MonitorTest(unittest.TestCase):
         received, hides = [], []
         watcher.low_volume.connect(lambda *items: received.append(items))
         watcher.playback_ok.connect(lambda: hides.append(1))
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(len(received), 1)
         powerpoint.SlideShowWindows.Item(1).View.Slide.SlideIndex = 8
-        with patch("classfix.monitor.read_system_volume", return_value=(60, False)):
+        with patch("evetech.monitor.read_system_volume", return_value=(60, False)):
             watcher._inspect_slide_shows(powerpoint)
         self.assertEqual(len(hides), 1)
         self.assertEqual(len(received), 1)
@@ -207,7 +207,7 @@ class MonitorTest(unittest.TestCase):
         watcher.low_volume.connect(lambda *items: received.append(items))
         slide = powerpoint.SlideShowWindows.Item(1).View.Slide
         shapes = slide.Shapes
-        with patch("classfix.monitor.read_system_volume", return_value=(0, True)):
+        with patch("evetech.monitor.read_system_volume", return_value=(0, True)):
             watcher._inspect_slide_shows(powerpoint)   # 第 7 页：提示一次
             watcher._inspect_slide_shows(powerpoint)   # 同页重复轮询：不再提示
             slide.Shapes = Collection()
@@ -233,8 +233,8 @@ class MonitorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             deck = Path(temporary) / "lesson.pptx"
             make_deck(deck)
-            with patch("classfix.monitor.find_ffprobe", return_value="ffprobe.exe"), \
-                 patch("classfix.monitor.probe_asset", return_value=Probe("ok", "", "avi", "", ("mpeg4",), ("mp3",), ("yuv420p",))):
+            with patch("evetech.monitor.find_ffprobe", return_value="ffprobe.exe"), \
+                 patch("evetech.monitor.probe_asset", return_value=Probe("ok", "", "avi", "", ("mpeg4",), ("mp3",), ("yuv420p",))):
                 problems = inspect_presentation(deck)
             self.assertEqual([(item.slide, item.category_title) for item in problems],
                              [(1, "视频兼容性风险"), (2, "外部视频链接失效")])
@@ -264,8 +264,8 @@ class MonitorTest(unittest.TestCase):
 
     def test_per_user_startup_shortcut_can_be_added_and_removed(self):
         with tempfile.TemporaryDirectory() as temporary:
-            link = Path(temporary) / "ClassFix.lnk"
-            with patch("classfix.startup.shortcut_path", return_value=link):
+            link = Path(temporary) / "EveTech.lnk"
+            with patch("evetech.startup.shortcut_path", return_value=link):
                 self.assertTrue(set_startup(True))
                 self.assertTrue(link.is_file())
                 self.assertTrue(set_startup(False))
@@ -273,7 +273,7 @@ class MonitorTest(unittest.TestCase):
 
     def test_single_instance_lock_rejects_second_process_role(self):
         with tempfile.TemporaryDirectory() as temporary:
-            name = "ClassFix-Test-" + Path(temporary).name
+            name = "EveTech-Test-" + Path(temporary).name
             lock = Path(temporary) / "instance.lock"
             first = SingleInstance(name, lock, lambda _message: None)
             second = SingleInstance(name, lock, lambda _message: None)
@@ -287,7 +287,7 @@ class MonitorTest(unittest.TestCase):
     def test_blocked_lock_reports_instead_of_silent_exit(self):
         """旧版本占着锁、又没有同名本地服务时，必须报 blocked（界面据此提示用户）。"""
         with tempfile.TemporaryDirectory() as temporary:
-            name = "ClassFix-Test-blocked-" + Path(temporary).name
+            name = "EveTech-Test-blocked-" + Path(temporary).name
             lock = Path(temporary) / "instance.lock"
             holder = QLockFile(str(lock))
             self.assertTrue(holder.tryLock(0))

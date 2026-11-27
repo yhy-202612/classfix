@@ -9,7 +9,7 @@ from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from classfix.ui.widgets import icon
+from evetech.ui.widgets import icon
 
 
 def write_icon(path):

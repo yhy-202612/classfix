@@ -6,12 +6,12 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import patch
 
-from classfix.layered import LayeredDiagnostics, PlaybackFailure, playback_report
-from classfix.media_trace import PowerPointTarget, TraceResult, collect_trace, parse_trace
-from classfix.model import Check
-from classfix.monitor import MediaProblem
-from classfix.storage import Store
-from classfix.windows_events import OfficeEvent, matching_wer, parse_application_event
+from evetech.layered import LayeredDiagnostics, PlaybackFailure, playback_report
+from evetech.media_trace import PowerPointTarget, TraceResult, collect_trace, parse_trace
+from evetech.model import Check
+from evetech.monitor import MediaProblem
+from evetech.storage import Store
+from evetech.windows_events import OfficeEvent, matching_wer, parse_application_event
 
 
 STAMP = datetime(2026, 11, 22, tzinfo=timezone.utc)
@@ -72,7 +72,7 @@ class EventAndTraceTests(unittest.TestCase):
             self.assertEqual(parse_trace(xml, 777), ())
 
     def test_trace_does_not_start_with_unverified_process(self):
-        with patch("classfix.media_trace._capture") as capture:
+        with patch("evetech.media_trace._capture") as capture:
             result = collect_trace(None, Event())
         capture.assert_not_called()
         self.assertEqual(result.state, "unavailable")
@@ -120,7 +120,7 @@ class DiagnosticFusionTests(unittest.TestCase):
             return len(writes)
 
         controller = LayeredDiagnostics(persist, lambda: True)
-        with patch("classfix.layered.run_job") as job:
+        with patch("evetech.layered.run_job") as job:
             controller.handle_playback_failure(self.failure())
             self.assertEqual(job.call_count, 1)
             finish = job.call_args.args[1]
@@ -135,7 +135,7 @@ class DiagnosticFusionTests(unittest.TestCase):
     def test_disabled_trace_still_saves_report(self):
         stack = []
         controller = LayeredDiagnostics(lambda *args: stack.append(args), lambda: False)
-        with patch("classfix.layered.run_job") as job:
+        with patch("evetech.layered.run_job") as job:
             controller.handle_playback_failure(self.failure())
         job.assert_not_called()
         self.assertIn("已在设置中关闭", stack[0][1].checks[-1].detail)
@@ -150,7 +150,7 @@ class DiagnosticFusionTests(unittest.TestCase):
         controller = LayeredDiagnostics(persist, lambda: False)
         controller._log_stop = Event()
         event = OfficeEvent(1000, STAMP.timestamp(), 888, REPORT_ID, "mf.dll", "0xC0000005")
-        with patch("classfix.layered.run_job") as job, patch("classfix.layered.matching_wer", return_value="同一报告"):
+        with patch("evetech.layered.run_job") as job, patch("evetech.layered.matching_wer", return_value="同一报告"):
             controller._on_event(Event(), event)  # stale subscription
             controller._on_event(controller._log_stop, event)
             controller._on_event(controller._log_stop, event)

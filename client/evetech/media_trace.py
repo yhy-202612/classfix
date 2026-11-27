@@ -114,7 +114,7 @@ def _properties(session_id, file):
 
 def _capture(target, file, stop):
     session_id = uuid4()
-    session_name = f"ClassFix-Media-{session_id.hex}"
+    session_name = f"EveTech-Media-{session_id.hex}"
     buffer = _properties(session_id, file)
     props = C.byref(buffer.properties)
     handle = U64()
@@ -199,7 +199,7 @@ def collect_trace(target, stop):
     if stop.is_set():
         return TraceResult("unavailable", "追踪已取消。")
     try:
-        with tempfile.TemporaryDirectory(prefix="ClassFix-etw-") as directory:
+        with tempfile.TemporaryDirectory(prefix="EveTech-etw-") as directory:
             etl = Path(directory) / "playback.etl"
             sample = _capture(target, etl, stop)
             if sample.state != "sample":

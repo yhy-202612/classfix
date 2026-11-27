@@ -5,10 +5,10 @@ from unittest.mock import patch
 from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 
-import classfix.ui.video as video_module
-from classfix import flow, opencheck
-from classfix.model import Check, Report
-from classfix.ui.theme import apply_theme
+import evetech.ui.video as video_module
+from evetech import flow, opencheck
+from evetech.model import Check, Report
+from evetech.ui.theme import apply_theme
 
 
 def report():
