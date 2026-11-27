@@ -17,8 +17,6 @@ jobs:
       run:
         working-directory: client
     env:
-      EVETECH_DATA_DIR: ${{ runner.temp }}\eve-goose-qa
-      QA_REPORT: ${{ runner.temp }}\eve-goose-report
       QT_ACCESSIBILITY: '1'
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +29,10 @@ jobs:
           python -m pip install -r requirements-build.txt pillow pywinauto
       - name: Set up the official Goose
         run: |
+          $env:EVETECH_DATA_DIR = Join-Path $env:RUNNER_TEMP 'eve-goose-qa'
+          $env:QA_REPORT = Join-Path $env:RUNNER_TEMP 'eve-goose-report'
+          "EVETECH_DATA_DIR=$env:EVETECH_DATA_DIR" >> $env:GITHUB_ENV
+          "QA_REPORT=$env:QA_REPORT" >> $env:GITHUB_ENV
           New-Item -ItemType Directory -Force $env:QA_REPORT | Out-Null
           python goose_setup.py --yes
       - name: Build the native Windows distribution
@@ -45,6 +47,6 @@ jobs:
         if: always()
         with:
           name: windows-goose-preview-evidence
-          path: ${{ env.QA_REPORT }}
+          path: ${{ runner.temp }}/eve-goose-report
           if-no-files-found: warn
           retention-days: 7
