@@ -70,7 +70,7 @@ def pet_bounds(pid):
 
 
 def visible_goose(pid, before):
-    screen = ImageGrab.grab().convert("RGB")
+    screen = ImageGrab.grab(include_layered_windows=True).convert("RGB")
     for box in pet_bounds(pid):
         crop = screen.crop(box)
         changed = ImageChops.difference(before.crop(box), crop).getbbox()
@@ -108,12 +108,13 @@ def main():
         else:
             window.print_control_identifiers()
             raise RuntimeError("Could not scroll to the Preview Goose button")
-        before = ImageGrab.grab().convert("RGB")
+        before = ImageGrab.grab(include_layered_windows=True).convert("RGB")
         before.save(report / "before-preview.png")
         print("Before clicking:", desktop_pet_status(window), flush=True)
         preview.click_input()
         result = wait_for(lambda: visible_goose(child.pid, before), 12)
-        status = desktop_pet_status(window)
+        status = wait_for(lambda: [text for text in desktop_pet_status(window) if "preview is active" in text],
+                          2) or desktop_pet_status(window)
         print("After clicking:", status, "Goose window bounds:", pet_bounds(child.pid), flush=True)
         if not result:
             raise RuntimeError("No rendered goose was visible in the captured Windows desktop pixels")
@@ -124,7 +125,7 @@ def main():
         if not any("preview is active" in message for message in status):
             raise RuntimeError("EveTech did not acknowledge the preview")
     except Exception:
-        ImageGrab.grab().save(report / "preview-failure.png")
+        ImageGrab.grab(include_layered_windows=True).save(report / "preview-failure.png")
         raise
     finally:
         process = psutil.Process(child.pid) if child.poll() is None else None
