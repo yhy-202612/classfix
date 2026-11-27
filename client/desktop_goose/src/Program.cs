@@ -24,6 +24,14 @@ namespace ClassroomGoose
 
     internal static class Program
     {
+        internal static void Trace(string message)
+        {
+            string log = Environment.GetEnvironmentVariable("QA_REPORT");
+            if (String.IsNullOrEmpty(log)) return;
+            lock (typeof(Program))
+                File.AppendAllText(Path.Combine(log, "helper-trace.txt"), DateTime.Now.ToString("HH:mm:ss.fff") + " " + message + "\n");
+        }
+
         [STAThread]
         private static void Main(string[] args)
         {
@@ -37,6 +45,7 @@ namespace ClassroomGoose
                 {
                     HostMessage settings = Read(input, json);
                     if (settings == null || settings.Action != "configure") return;
+                    Trace("initial configure read");
 
                     stage = "initializing Windows graphics";
                     Native.SetProcessDPIAware();
@@ -59,7 +68,11 @@ namespace ClassroomGoose
                         app.VisibilityChanged += message => Send(output, json, "visibility", message);
                         var ignored = dispatcher.Handle;
                         Action<HostMessage> preview = command =>
+                        {
+                            Trace("preview callback running");
                             Send(output, json, "preview", app.Preview(new IntPtr(command.Window)));
+                            Trace("preview reply sent");
+                        };
                         dispatcher.BeginInvoke(new MethodInvoker(delegate
                         {
                             Send(output, json, "ready", settings.Goose ? app.VisibilityStatus : "Touch keyboard helper is ready.");
@@ -69,6 +82,7 @@ namespace ClassroomGoose
                                 Name = "EveTech desktop pet commands"
                             };
                             reader.Start();
+                            Trace("reader started");
                         }));
                         stage = "running the desktop pet";
                         Application.Run(app);
@@ -76,6 +90,7 @@ namespace ClassroomGoose
                 }
                 catch (Exception error)
                 {
+                    Trace(error.ToString());
                     Send(output, json, "error", StartupError(error, stage));
                 }
             }
@@ -103,8 +118,10 @@ namespace ClassroomGoose
             {
                 var json = new JavaScriptSerializer { MaxJsonLength = 16384 };
                 HostMessage command;
+                Trace("reading subsequent commands");
                 while ((command = Read(input, json)) != null)
                 {
+                    Trace("read " + command.Action);
                     if (command.Action == "stop") break;
                     if (command.Action == "configure")
                     {
@@ -117,14 +134,16 @@ namespace ClassroomGoose
                     {
                         HostMessage current = command;
                         dispatcher.BeginInvoke(new MethodInvoker(() => preview(current)));
+                        Trace("preview enqueued");
                     }
                 }
             }
-            catch (IOException) { }
-            catch (InvalidOperationException) { }
-            catch (ArgumentException) { }
+            catch (IOException error) { Trace(error.ToString()); }
+            catch (InvalidOperationException error) { Trace(error.ToString()); }
+            catch (ArgumentException error) { Trace(error.ToString()); }
             finally
             {
+                Trace("reader exiting");
                 try { if (!dispatcher.IsDisposed) dispatcher.BeginInvoke(new MethodInvoker(app.ExitThread)); }
                 catch (InvalidOperationException) { }
             }

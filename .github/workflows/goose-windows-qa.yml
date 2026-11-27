@@ -49,6 +49,10 @@ jobs:
       - name: Export desktop screenshot for review
         if: always()
         run: |
+          Get-ChildItem -LiteralPath $env:QA_REPORT -Filter '*-trace.txt' | ForEach-Object {
+            Write-Output $_.Name
+            Get-Content -LiteralPath $_.FullName
+          }
           Get-ChildItem -LiteralPath $env:QA_REPORT -Filter 'preview-*.png' | ForEach-Object {
             $encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName))
             for ($offset = 0; $offset -lt $encoded.Length; $offset += 4096) {

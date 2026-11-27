@@ -1,6 +1,7 @@
 """Manage the local EveTech desktop pet and touch keyboard helper."""
 
 import json
+import os
 import sys
 import ctypes
 from pathlib import Path
@@ -188,7 +189,11 @@ class DesktopGoose(QObject):
         self._send_configuration()
 
     def _send(self, value):
-        self.process.write(json.dumps(value, ensure_ascii=True).encode("ascii") + b"\n")
+        sent = self.process.write(json.dumps(value, ensure_ascii=True).encode("ascii") + b"\n")
+        report = os.environ.get("QA_REPORT")
+        if report:
+            with (Path(report) / "host-trace.txt").open("a") as trace:
+                trace.write(f"Wrote {value['Action']}: {sent} bytes, {self.process.bytesToWrite()} queued\n")
 
     def _send_configuration(self):
         if self._closed or self._stopping or self.process.state() != QProcess.ProcessState.Running:
