@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Timer = System.Windows.Forms.Timer;
 
@@ -18,7 +19,7 @@ namespace ClassroomGoose
         private readonly NestWindow nest;
         private readonly ChatWindow chat;
         private readonly TouchKeyboard keyboard;
-        private readonly DeepSeek api = new DeepSeek();
+        private DeepSeek api;
         private readonly HotkeyWindow hotkey;
         private readonly Timer policy = new Timer { Interval = 180 };
         private readonly Timer motion = new Timer { Interval = 16 };
@@ -428,7 +429,7 @@ namespace ClassroomGoose
             chat.Dismiss(true);
             try
             {
-                var response = await api.Ask(question, apiKey, current.Token);
+                var response = await AskDeepSeek(question, current.Token);
                 if (closed || request != current || current.IsCancellationRequested) return;
                 latest = response;
                 pendingDelivery = response.CanDeliver && mayDeliver && InSchedule && goose != null;
@@ -448,6 +449,13 @@ namespace ClassroomGoose
                 }
                 current.Dispose();
             }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private Task<Reply> AskDeepSeek(string question, CancellationToken cancellation)
+        {
+            if (api == null) api = new DeepSeek();
+            return api.Ask(question, apiKey, cancellation);
         }
 
         private void CancelQuestion()
@@ -479,7 +487,7 @@ namespace ClassroomGoose
                 if (pet != null) pet.Dispose();
                 if (nest != null) nest.Dispose();
                 if (goose != null) goose.Dispose();
-                api.Dispose();
+                if (api != null) api.Dispose();
             }
             base.Dispose(disposing);
         }

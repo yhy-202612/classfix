@@ -27,6 +27,15 @@ namespace ClassroomGoose
             catch (ArgumentException) { return false; }
         }
 
+        internal static void BindApi(string folder)
+        {
+            var api = Assembly.LoadFrom(Path.Combine(Path.GetFullPath(folder), "GooseModdingAPI.dll"));
+            // The helper and the original goose live in separate directories. The .NET
+            // Framework default load context may ask for this API again by name.
+            AppDomain.CurrentDomain.AssemblyResolve += (sender, request) =>
+                String.Equals(request.Name, api.FullName, StringComparison.OrdinalIgnoreCase) ? api : null;
+        }
+
         private static bool HasHash(string file, string expected)
         {
             using (var stream = File.OpenRead(file))

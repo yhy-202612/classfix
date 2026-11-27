@@ -31,21 +31,25 @@ namespace ClassroomGoose
             using (var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true })
             {
                 var json = new JavaScriptSerializer { MaxJsonLength = 16384 };
+                string stage = "reading desktop pet settings";
                 try
                 {
                     HostMessage settings = Read(input, json);
                     if (settings == null || settings.Action != "configure") return;
 
+                    stage = "initializing Windows graphics";
                     Native.SetProcessDPIAware();
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
 
                     string folder = settings.Folder;
+                    stage = "loading GooseModdingAPI.dll";
                     if (StockFiles.Validate(folder))
-                        Assembly.LoadFrom(Path.Combine(folder, "GooseModdingAPI.dll"));
+                        StockFiles.BindApi(folder);
                     else
                         folder = null;
 
+                    stage = "initializing the desktop pet";
                     using (var app = new GooseApplication(folder, settings))
                     using (var dispatcher = new Control())
                     {
@@ -65,18 +69,19 @@ namespace ClassroomGoose
                             reader.Start();
                         };
                         Application.Idle += ready;
+                        stage = "running the desktop pet";
                         try { Application.Run(app); }
                         finally { Application.Idle -= ready; }
                     }
                 }
                 catch (Exception error)
                 {
-                    Send(output, json, "error", StartupError(error));
+                    Send(output, json, "error", StartupError(error, stage));
                 }
             }
         }
 
-        private static string StartupError(Exception error)
+        private static string StartupError(Exception error, string stage)
         {
             while (error.InnerException != null &&
                    (error is TargetInvocationException || error is TypeInitializationException))
@@ -84,8 +89,12 @@ namespace ClassroomGoose
             if (error is FileLoadException && error.HResult == unchecked((int)0x80131515))
                 return "Windows blocked a downloaded Desktop Goose file (0x80131515). " +
                        "Open Desktop Pet and click Download & Set Up, or import the official Windows ZIP.";
-            return "The desktop pet helper could not start (" + error.GetType().Name +
-                   ", 0x" + error.HResult.ToString("X8") + ").";
+            var missing = error as FileNotFoundException;
+            var failedLoad = error as FileLoadException;
+            string file = missing != null ? missing.FileName : failedLoad != null ? failedLoad.FileName : null;
+            string component = String.IsNullOrWhiteSpace(file) ? "" : " · " + Path.GetFileName(file);
+            return "The desktop pet helper failed while " + stage + " (" + error.GetType().Name +
+                   ", 0x" + error.HResult.ToString("X8") + component + ").";
         }
 
         private static void Listen(StreamReader input, JavaScriptSerializer json, GooseApplication app, Control dispatcher)

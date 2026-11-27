@@ -39,9 +39,16 @@ namespace ClassroomGoose
             Check(!DeepSeek.ParseReply("{\"choices\":[{\"message\":{\"content\":\"partial\"}}]}").CanDeliver, "unfinalized text is not displayed");
             Console.WriteLine("DeepSeek reply safety passed");
 
+            var startupError = typeof(Program).GetMethod("StartupError", BindingFlags.NonPublic | BindingFlags.Static);
+            var missing = new TargetInvocationException(new FileNotFoundException("Missing", @"C:\Goose\GooseModdingAPI.dll"));
+            string diagnostic = (string)startupError.Invoke(null, new object[] { missing, "loading Desktop Goose" });
+            Check(diagnostic.Contains("loading Desktop Goose") && diagnostic.Contains("GooseModdingAPI.dll") &&
+                  diagnostic.Contains("0x80070002") && !diagnostic.Contains(@"C:\Goose"),
+                  "missing dependency reports the stage, code and filename without the local path");
+
             string folder = args[0];
             Check(StockFiles.Validate(folder), "stock runtime matches expected v0.31");
-            Assembly.LoadFrom(Path.Combine(folder, "GooseModdingAPI.dll"));
+            StockFiles.BindApi(folder);
             Application.EnableVisualStyles();
             if (args.Length > 1 && args[1] == "--roaming")
             {

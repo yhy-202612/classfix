@@ -114,7 +114,7 @@ class SettingsPage(Page):
         row.addWidget(button("Choose folder…", self.choose_goose))
         content.addLayout(row)
         actions = horizontal()
-        self.goose_download = button("Download & Set Up", self.download_goose, "primary")
+        self.goose_download = button("Download && Set Up", self.download_goose, "primary")
         self.goose_import = button("Import Goose ZIP…", self.import_goose, "link")
         actions.addWidget(self.goose_download)
         actions.addWidget(self.goose_import)
@@ -129,6 +129,7 @@ class SettingsPage(Page):
         self.goose_preview.setToolTip("Show the goose for 30 seconds outside school hours.")
         content.addWidget(self.goose_preview, alignment=Qt.AlignmentFlag.AlignLeft)
         self.goose_status = label("DeepSeek is optional. You can open Ask Goose from the system tray.", "muted")
+        self.goose_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         content.addWidget(self.goose_status)
         self.body.addWidget(self.goose_panel)
 

@@ -1,4 +1,4 @@
-# EveTech 1.6.9
+# EveTech 1.6.10
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
@@ -176,6 +176,10 @@ $run.ExitCode
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.6.10
+
+- Fixed assembly resolution for the verified Goose API when it is installed outside the EveTech folder. Goose preview starts independently of the DeepSeek client. Startup errors include the failed step and the affected file when available.
 
 ### 1.6.9
 
