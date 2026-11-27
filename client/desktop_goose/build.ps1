@@ -7,8 +7,11 @@ if ((Get-FileHash -LiteralPath $gooseApi -Algorithm SHA256).Hash -ne 'EFA31DF7AB
     throw 'Choose the original Desktop Goose v0.31 directory.'
 }
 
-$framework = [Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()
+$framework = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 $csc = Join-Path $framework 'csc.exe'
+if (-not (Test-Path -LiteralPath $csc -PathType Leaf)) {
+    throw 'The Windows x64 .NET Framework 4 compiler was not found.'
+}
 $wpf = Join-Path $framework 'WPF'
 $dist = Join-Path $PSScriptRoot 'dist'
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
