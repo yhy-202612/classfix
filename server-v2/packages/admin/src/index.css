@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-brand-50 text-ink antialiased;
+    font-family: 'Microsoft YaHei UI', 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  ::selection {
+    background-color: #d8e6ff;
+  }
+
+  /* 移动端横向 tab 的滚动条收窄 */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

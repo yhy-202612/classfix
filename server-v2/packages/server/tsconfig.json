@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@classfix/shared": ["../shared/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}
