@@ -1,4 +1,4 @@
-# EveTech 1.6.11
+# EveTech 1.6.12
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
@@ -176,6 +176,10 @@ $run.ExitCode
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.6.12
+
+- Fixes an issue on Windows where a running Desktop Goose helper could stop receiving preview commands while idle. EveTech now uses a local named pipe restricted to the current Windows user.
 
 ### 1.6.11
 

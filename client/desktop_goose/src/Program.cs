@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Pipes;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -24,20 +25,23 @@ namespace ClassroomGoose
 
     internal static class Program
     {
-        internal static void Trace(string message)
-        {
-            string log = Environment.GetEnvironmentVariable("QA_REPORT");
-            if (String.IsNullOrEmpty(log)) return;
-            lock (typeof(Program))
-                File.AppendAllText(Path.Combine(log, "helper-trace.txt"), DateTime.Now.ToString("HH:mm:ss.fff") + " " + message + "\n");
-        }
-
         [STAThread]
         private static void Main(string[] args)
         {
-            if (args.Length != 1 || args[0] != "--evetech") return;
-            using (var input = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8))
-            using (var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true })
+            if (args.Length != 2 || args[0] != "--evetech") return;
+            using (var pipe = new NamedPipeClientStream(".", args[1], PipeDirection.InOut, PipeOptions.Asynchronous))
+            {
+                try { pipe.Connect(5000); }
+                catch (TimeoutException) { return; }
+                catch (IOException) { return; }
+                Run(pipe);
+            }
+        }
+
+        private static void Run(Stream pipe)
+        {
+            using (var input = new StreamReader(pipe, Encoding.UTF8, false, 1024, true))
+            using (var output = new StreamWriter(pipe, new UTF8Encoding(false), 1024, true) { AutoFlush = true })
             {
                 var json = new JavaScriptSerializer { MaxJsonLength = 16384 };
                 string stage = "reading desktop pet settings";
@@ -45,7 +49,6 @@ namespace ClassroomGoose
                 {
                     HostMessage settings = Read(input, json);
                     if (settings == null || settings.Action != "configure") return;
-                    Trace("initial configure read");
 
                     stage = "initializing Windows graphics";
                     Native.SetProcessDPIAware();
@@ -68,11 +71,7 @@ namespace ClassroomGoose
                         app.VisibilityChanged += message => Send(output, json, "visibility", message);
                         var ignored = dispatcher.Handle;
                         Action<HostMessage> preview = command =>
-                        {
-                            Trace("preview callback running");
                             Send(output, json, "preview", app.Preview(new IntPtr(command.Window)));
-                            Trace("preview reply sent");
-                        };
                         dispatcher.BeginInvoke(new MethodInvoker(delegate
                         {
                             Send(output, json, "ready", settings.Goose ? app.VisibilityStatus : "Touch keyboard helper is ready.");
@@ -82,7 +81,6 @@ namespace ClassroomGoose
                                 Name = "EveTech desktop pet commands"
                             };
                             reader.Start();
-                            Trace("reader started");
                         }));
                         stage = "running the desktop pet";
                         Application.Run(app);
@@ -90,7 +88,6 @@ namespace ClassroomGoose
                 }
                 catch (Exception error)
                 {
-                    Trace(error.ToString());
                     Send(output, json, "error", StartupError(error, stage));
                 }
             }
@@ -118,10 +115,8 @@ namespace ClassroomGoose
             {
                 var json = new JavaScriptSerializer { MaxJsonLength = 16384 };
                 HostMessage command;
-                Trace("reading subsequent commands");
                 while ((command = Read(input, json)) != null)
                 {
-                    Trace("read " + command.Action);
                     if (command.Action == "stop") break;
                     if (command.Action == "configure")
                     {
@@ -134,16 +129,14 @@ namespace ClassroomGoose
                     {
                         HostMessage current = command;
                         dispatcher.BeginInvoke(new MethodInvoker(() => preview(current)));
-                        Trace("preview enqueued");
                     }
                 }
             }
-            catch (IOException error) { Trace(error.ToString()); }
-            catch (InvalidOperationException error) { Trace(error.ToString()); }
-            catch (ArgumentException error) { Trace(error.ToString()); }
+            catch (IOException) { }
+            catch (InvalidOperationException) { }
+            catch (ArgumentException) { }
             finally
             {
-                Trace("reader exiting");
                 try { if (!dispatcher.IsDisposed) dispatcher.BeginInvoke(new MethodInvoker(app.ExitThread)); }
                 catch (InvalidOperationException) { }
             }

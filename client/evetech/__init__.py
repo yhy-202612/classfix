@@ -1,3 +1,3 @@
 """EveTech Windows classroom diagnostics."""
 
-VERSION = "1.6.11"
+VERSION = "1.6.12"

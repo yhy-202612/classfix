@@ -146,37 +146,29 @@ namespace ClassroomGoose
 
         internal string Preview(IntPtr window)
         {
-            Program.Trace("Preview entered " + window);
             if (!enabled || goose == null || paused || slideshow || Native.SlideshowWindow() != IntPtr.Zero ||
                 Native.IsFullScreen(ownPid, window))
             {
                 ApplyPolicy();
-                Program.Trace("Preview blocked: " + VisibilityStatus);
                 return VisibilityStatus;
             }
             previewHost = window;
             previewWork = (window == IntPtr.Zero ? Screen.PrimaryScreen : Screen.FromHandle(window)).WorkingArea;
-            Program.Trace("Preview work area " + previewWork);
             previewClock.Restart();
             ApplyPolicy();
-            Program.Trace("Preview policy applied");
             if (CanAppear && (!pet.Visible || !Work.Contains(goose.Position)))
             {
                 StopDelivery(CanRetainDelivery());
                 int x = Work.Right - Math.Min(160, Work.Width / 2);
                 goose.ResetPosition(new Point(x, WalkY()), false);
-                Program.Trace("Preview position reset");
                 pet.UpdatePose(Work);
-                Program.Trace("Preview pose updated");
                 ChooseWander();
                 motion.Start();
             }
             if (CanAppear && pet.Visible)
             {
                 Native.RaiseWithoutFocus(pet.Handle);
-                Program.Trace("Preview window raised");
                 pet.Update();
-                Program.Trace("Preview window painted");
             }
             return VisibilityStatus;
         }
