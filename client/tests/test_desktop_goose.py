@@ -40,6 +40,7 @@ class DesktopGooseTest(unittest.TestCase):
         process = Mock()
         process.state.return_value = QProcess.ProcessState.Running
         controller.process = process
+        controller._connection = Mock()
         controller._send = Mock()
 
         self.assertTrue(controller.active())
@@ -97,7 +98,8 @@ class DesktopGooseTest(unittest.TestCase):
         self.addCleanup(controller.deleteLater)
         self.addCleanup(controller._clear_preview)
         controller.process = Mock()
-        controller.process.readAllStandardOutput.return_value = (
+        controller._connection = Mock()
+        controller._connection.readAll.return_value = (
             b'{"kind":"visibility","message":"This is not a preview reply."}\n'
             b'{"kind":"preview","message":"Desktop Goose preview is active."}\n'
         )

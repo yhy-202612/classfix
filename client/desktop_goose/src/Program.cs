@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Pipes;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -27,9 +28,20 @@ namespace ClassroomGoose
         [STAThread]
         private static void Main(string[] args)
         {
-            if (args.Length != 1 || args[0] != "--evetech") return;
-            using (var input = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8))
-            using (var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true })
+            if (args.Length != 2 || args[0] != "--evetech") return;
+            using (var pipe = new NamedPipeClientStream(".", args[1], PipeDirection.InOut, PipeOptions.Asynchronous))
+            {
+                try { pipe.Connect(5000); }
+                catch (TimeoutException) { return; }
+                catch (IOException) { return; }
+                Run(pipe);
+            }
+        }
+
+        private static void Run(Stream pipe)
+        {
+            using (var input = new StreamReader(pipe, Encoding.UTF8, false, 1024, true))
+            using (var output = new StreamWriter(pipe, new UTF8Encoding(false), 1024, true) { AutoFlush = true })
             {
                 var json = new JavaScriptSerializer { MaxJsonLength = 16384 };
                 string stage = "reading desktop pet settings";

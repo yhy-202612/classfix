@@ -5,8 +5,10 @@ import sys
 import ctypes
 from pathlib import Path
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
+from PySide6.QtNetwork import QLocalServer
 
 from .goose_install import original_goose_available
 from .update import install_root
@@ -65,6 +67,10 @@ class DesktopGoose(QObject):
         self._last_config = None
         self._output = bytearray()
         self._reported_error = False
+        self._pipe = QLocalServer(self)
+        self._pipe.setSocketOptions(QLocalServer.SocketOption.UserAccessOption)
+        self._pipe.newConnection.connect(self._connect_helper)
+        self._connection = None
         self._preview_wait = QTimer(self)
         self._preview_wait.setSingleShot(True)
         self._preview_wait.setInterval(8000)
@@ -72,13 +78,11 @@ class DesktopGoose(QObject):
 
         self.process = QProcess(self)
         self.process.setProgram(str(self.executable))
-        self.process.setArguments(["--evetech"])
         environment = QProcessEnvironment.systemEnvironment()
         for name in ("EVETECH_AI_KEY", "CLASSFIX_AI_KEY", "DEEPSEEK_API_KEY"):
             environment.remove(name)
         self.process.setProcessEnvironment(environment)
         self.process.started.connect(self._send_configuration)
-        self.process.readyReadStandardOutput.connect(self._read_output)
         self.process.readyReadStandardError.connect(self.process.readAllStandardError)
         self.process.errorOccurred.connect(self._handle_error)
         self.process.finished.connect(self._finished)
@@ -128,9 +132,15 @@ class DesktopGoose(QObject):
             if self._preview_window is not None:
                 self._preview_wait.start()
         if self.process.state() == QProcess.ProcessState.NotRunning:
+            self._close_pipe()
+            if not self._pipe.listen("EveTechGoose-" + uuid4().hex):
+                self._clear_preview()
+                self.status.emit("EveTech could not open the desktop pet's local connection.")
+                return
             self._folder = folder
             self._output.clear()
             self._reported_error = False
+            self.process.setArguments(["--evetech", self._pipe.serverName()])
             self.status.emit("Starting the desktop pet helper…")
             self.process.start()
         elif self.process.state() == QProcess.ProcessState.Running:
@@ -187,11 +197,34 @@ class DesktopGoose(QObject):
         self.slideshow = bool(value)
         self._send_configuration()
 
+    def _connect_helper(self):
+        connection = self._pipe.nextPendingConnection()
+        if connection is None:
+            return
+        if self._connection is not None:
+            connection.abort()
+            connection.deleteLater()
+            return
+        self._connection = connection
+        self._pipe.close()
+        connection.readyRead.connect(self._read_output)
+        self._send_configuration()
+
+    def _close_pipe(self):
+        self._pipe.close()
+        if self._connection is not None:
+            connection, self._connection = self._connection, None
+            connection.abort()
+            connection.deleteLater()
+
     def _send(self, value):
-        self.process.write(json.dumps(value, ensure_ascii=True).encode("ascii") + b"\n")
+        if self._connection is not None:
+            self._connection.write(json.dumps(value, ensure_ascii=True).encode("ascii") + b"\n")
+            self._connection.flush()
 
     def _send_configuration(self):
-        if self._closed or self._stopping or self.process.state() != QProcess.ProcessState.Running:
+        if (self._closed or self._stopping or self._connection is None
+                or self.process.state() != QProcess.ProcessState.Running):
             return
         config = self._configuration()
         if config != self._last_config:
@@ -199,7 +232,9 @@ class DesktopGoose(QObject):
             self._last_config = config
 
     def _read_output(self):
-        self._output.extend(bytes(self.process.readAllStandardOutput()))
+        if self._connection is None:
+            return
+        self._output.extend(bytes(self._connection.readAll()))
         while b"\n" in self._output:
             line, rest = self._output.split(b"\n", 1)
             self._output[:] = rest
@@ -235,6 +270,7 @@ class DesktopGoose(QObject):
 
     def _handle_error(self, error):
         if not self._stopping and error == QProcess.ProcessError.FailedToStart:
+            self._close_pipe()
             self._ready = False
             self._reported_error = True
             self._clear_preview()
@@ -242,6 +278,7 @@ class DesktopGoose(QObject):
 
     def _finished(self, exit_code, _exit_status):
         self._read_output()
+        self._close_pipe()
         was_ready = self._ready
         self._ready = False
         self._last_config = None
@@ -260,11 +297,13 @@ class DesktopGoose(QObject):
         try:
             if self.process.state() == QProcess.ProcessState.Running:
                 self._send({"Action": "stop"})
-                self.process.closeWriteChannel()
+                if self._connection is not None and self._connection.bytesToWrite():
+                    self._connection.waitForBytesWritten(200)
             if not self.process.waitForFinished(900) and self.process.state() != QProcess.ProcessState.NotRunning:
                 self.process.kill()
                 self.process.waitForFinished(500)
         finally:
+            self._close_pipe()
             self._ready = False
             self._last_config = None
             self._stopping = False

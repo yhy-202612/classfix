@@ -14,6 +14,9 @@ New-Item -ItemType Directory -Force -Path $BuildDirectory,$Destination | Out-Nul
 if (Test-Path -LiteralPath (Join-Path $Destination 'EveTech')) {
     throw 'EveTech already exists in the destination. Choose a fresh destination for the new build.'
 }
+if ($DesktopGooseFolder) {
+    & (Join-Path $PSScriptRoot 'desktop_goose\build.ps1') -DesktopGooseFolder $DesktopGooseFolder
+}
 $icon = Join-Path $BuildDirectory 'EveTech.ico'
 & $Python (Join-Path $PSScriptRoot 'tools\build_icon.py') $icon
 if ($LASTEXITCODE -ne 0) { throw 'Icon generation failed.' }
@@ -29,9 +32,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Version info generation failed.' }
     (Join-Path $PSScriptRoot 'main.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
 $output = Join-Path $Destination 'EveTech'
-if ($DesktopGooseFolder) {
-    & (Join-Path $PSScriptRoot 'desktop_goose\build.ps1') -DesktopGooseFolder $DesktopGooseFolder
-}
 $gooseHelper = Join-Path $PSScriptRoot 'desktop_goose\dist\EveTechGoose.exe'
 if (Test-Path -LiteralPath $gooseHelper -PathType Leaf) {
     $toolDirectory = Join-Path $output 'tools'
