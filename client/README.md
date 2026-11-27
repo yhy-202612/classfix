@@ -1,4 +1,4 @@
-# EveTech 1.6.10
+# EveTech 1.6.11
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
@@ -90,7 +90,7 @@ EveTech 的检测为只读。修复由教师通过 PowerPoint 或 Windows 设置
 - In Settings, open **Desktop Pet** and select **Download & Set Up**. EveTech downloads the original Windows v0.31 ZIP directly from itch.io, verifies it, and enables the goose for your Windows account. If you already have the original ZIP, use **Import Goose ZIP…** or run `EveTechGooseSetup.exe` with that ZIP as its argument. You can also run the downloader by itself and confirm the download. Restart EveTech after using the standalone downloader. [Official Desktop Goose download](https://samperson.itch.io/desktop-goose)
 - If Windows reports a downloaded file is blocked, select **Download & Set Up** or **Import Goose ZIP…** to install a verified copy. After setup, the EveTech tray menu has **Enable Desktop Goose** and a **Desktop Goose** submenu with **Ask Goose**, **Pause Desktop Goose**, and **Desktop Pet Settings…**.
 - The goose roams quietly during school breaks, eye exercises, group exercises, and lunch break. It walks offscreen when the next class starts. The schedule applies on weekdays by default. **Debug mode: ignore the school schedule** lets the goose roam any time, including weekends.
-- Select **Preview Goose** in **Desktop Pet** to see it for 30 seconds on the primary display outside school hours. The status below the button reports schedule, manual pause, full-screen, or setup issues.
+- Select **Preview Goose** in **Desktop Pet** to see it for 30 seconds on the display with the Settings window. The status below the button shows whether the helper answered and reports any pause, full-screen, or setup issue.
 - When a PowerPoint slideshow starts, the goose walks into a small straw nest on the slideshow display. Drag the nest to move it without taking keyboard focus from PowerPoint. The goose follows the new position while walking. **Pause Desktop Goose** hides the nest and the goose.
 - Select **Configure DeepSeek…** to enter a session-only API key for English chat. Click the goose, select **Ask Goose** in the tray, or press `Ctrl+Alt+G` to open the bubble. Select **Type Question** to expand the text chat or **Circle Screen** to close the bubble and select a screen region. The goose can deliver a completed text-chat answer after it passes the classroom content checks. If the goose is hidden, the answer remains in the chat. [DeepSeek content safety](https://api-docs.deepseek.com/guides/safety/)
 - **Show the touch keyboard when editing text** works independently. It follows editable focus and hides the Windows keyboard when focus leaves the editor. Use the Windows taskbar keyboard button for apps whose custom controls do not expose editable focus. [Windows touch keyboard](https://support.microsoft.com/en-us/windows/hardware/input-devices/enable-and-disable-the-touch-keyboard-in-windows)
@@ -176,6 +176,10 @@ $run.ExitCode
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.6.11
+
+- Desktop Goose preview appears immediately on the Settings display. The button reports startup, confirmation, timeout, or an early helper exit.
 
 ### 1.6.10
 

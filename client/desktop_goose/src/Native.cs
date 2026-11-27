@@ -117,10 +117,10 @@ namespace ClassroomGoose
             return IntPtr.Zero;
         }
 
-        internal static bool IsFullScreen(int ownPid)
+        internal static bool IsFullScreen(int ownPid, IntPtr previewHost)
         {
             IntPtr window = GetForegroundWindow();
-            if (!Visible(window)) return false;
+            if (window == previewHost || !Visible(window)) return false;
             int pid;
             GetWindowThreadProcessId(window, out pid);
             if (pid == ownPid) return false;

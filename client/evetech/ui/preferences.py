@@ -126,7 +126,7 @@ class SettingsPage(Page):
         actions.addWidget(button("Save Settings", self.save_goose))
         content.addLayout(actions)
         self.goose_preview = QPushButton("Preview Goose")
-        self.goose_preview.setToolTip("Show the goose for 30 seconds outside school hours.")
+        self.goose_preview.setToolTip("Show the goose on this display for 30 seconds, even outside school hours.")
         content.addWidget(self.goose_preview, alignment=Qt.AlignmentFlag.AlignLeft)
         self.goose_status = label("DeepSeek is optional. You can open Ask Goose from the system tray.", "muted")
         self.goose_status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)

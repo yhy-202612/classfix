@@ -106,10 +106,13 @@ namespace ClassroomGoose
                 WaitUntil(() => goose.Visible && Math.Abs(goose.Left - last.X) + Math.Abs(goose.Top - last.Y) > 15,
                           12, "goose resumes roaming after its pause");
                 settings.DebugAlwaysShow = false;
+                settings.Paused = true;
                 app.Configure(settings);
-                app.Preview();
-                Check(app.VisibilityStatus.Contains("preview"), "a preview ignores the school schedule");
-                WaitUntil(() => visibleGoose() != null, 10, "a preview renders the goose");
+                settings.Paused = false;
+                app.Configure(settings);
+                Check(visibleGoose() == null, "the goose is hidden before the preview request");
+                Check(app.Preview(host.Handle).Contains("preview"), "a preview acknowledges the request");
+                Check(visibleGoose() != null, "a preview immediately renders the goose on the settings display");
                 settings.DebugAlwaysShow = true;
                 app.Configure(settings);
                 using (var frame = new Bitmap(goose.Width, goose.Height))
@@ -128,7 +131,7 @@ namespace ClassroomGoose
                 settings.Paused = true;
                 app.Configure(settings);
                 Check(visibleGoose() == null, "manual pause hides a roaming goose");
-                app.Preview();
+                app.Preview(host.Handle);
                 Check(app.VisibilityStatus.Contains("paused"), "preview honors manual pause");
                 settings.Paused = false;
                 app.Configure(settings);

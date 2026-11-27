@@ -6,7 +6,7 @@ import ctypes
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, Signal
+from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 
 from .goose_install import original_goose_available
 from .update import install_root
@@ -60,10 +60,15 @@ class DesktopGoose(QObject):
         self._stopping = False
         self._closed = False
         self._ask_pending = False
-        self._preview_pending = False
+        self._preview_window = None
         self._folder = None
         self._last_config = None
         self._output = bytearray()
+        self._reported_error = False
+        self._preview_wait = QTimer(self)
+        self._preview_wait.setSingleShot(True)
+        self._preview_wait.setInterval(8000)
+        self._preview_wait.timeout.connect(self._preview_timeout)
 
         self.process = QProcess(self)
         self.process.setProgram(str(self.executable))
@@ -106,23 +111,26 @@ class DesktopGoose(QObject):
             return
         if not self.goose_enabled():
             self._ask_pending = False
-            self._preview_pending = False
+            self._clear_preview()
         if not self.active():
             self._stop()
             self.status.emit("Desktop pet and touch keyboard are off.")
             return
         if not self.executable.is_file():
-            self._preview_pending = False
+            self._clear_preview()
             self.status.emit("The desktop pet helper is missing. Extract the complete EveTech Windows package.")
             return
         folder = self.settings.get("desktop_goose_folder", "")
         if self.process.state() != QProcess.ProcessState.NotRunning and folder != self._folder:
-            pending = self._ask_pending, self._preview_pending
+            pending = self._ask_pending, self._preview_window
             self._stop()
-            self._ask_pending, self._preview_pending = pending
+            self._ask_pending, self._preview_window = pending
+            if self._preview_window is not None:
+                self._preview_wait.start()
         if self.process.state() == QProcess.ProcessState.NotRunning:
             self._folder = folder
             self._output.clear()
+            self._reported_error = False
             self.status.emit("Starting the desktop pet helper…")
             self.process.start()
         elif self.process.state() == QProcess.ProcessState.Running:
@@ -143,14 +151,33 @@ class DesktopGoose(QObject):
             ctypes.windll.user32.AllowSetForegroundWindow(int(self.process.processId()))
         self._send({"Action": "ask"})
 
-    def preview(self):
+    def preview(self, window=0):
         if not self.goose_enabled() or self._closed:
             self.status.emit("Enable Desktop Goose, choose the extracted v0.31 folder, and save Settings first.")
-        elif self._ready:
-            self._send({"Action": "preview"})
+            return
+        self._preview_window = int(window)
+        self._preview_wait.start()
+        if self._ready:
+            self._send_preview()
         else:
-            self._preview_pending = True
+            self.status.emit("Waiting for the desktop pet helper…")
             self.refresh()
+
+    def _send_preview(self):
+        self.status.emit("Requesting Desktop Goose preview…")
+        self._preview_wait.start()
+        self._send({"Action": "preview", "Window": self._preview_window})
+
+    def _clear_preview(self):
+        self._preview_window = None
+        self._preview_wait.stop()
+
+    def _preview_timeout(self):
+        message = ("The desktop pet helper did not answer the preview request. Try Preview Goose again."
+                   if self._ready else
+                   "The desktop pet helper did not finish starting. Try Preview Goose again.")
+        self._stop()
+        self.status.emit(message)
 
     def set_paused(self, value):
         self.paused = bool(value)
@@ -184,16 +211,22 @@ class DesktopGoose(QObject):
                 continue
             if result.get("kind") == "ready":
                 self._ready = True
-                self.status.emit(result.get("message") or "Desktop pet helper is ready.")
+                if self._preview_window is None:
+                    self.status.emit(result.get("message") or "Desktop pet helper is ready.")
                 if self._ask_pending:
                     self._ask_pending = False
                     self._open_chat()
-                if self._preview_pending:
-                    self._preview_pending = False
-                    self._send({"Action": "preview"})
+                if self._preview_window is not None:
+                    self._send_preview()
+            elif result.get("kind") == "preview" and self._preview_window is not None:
+                self._clear_preview()
+                self.status.emit(result.get("message") or "Desktop Goose answered the preview request.")
             elif result.get("kind") == "error":
+                self._reported_error = True
+                self._clear_preview()
                 self.status.emit(result.get("message") or "The desktop pet helper could not start.")
-            elif result.get("kind") == "visibility" and self.goose_enabled() and isinstance(result.get("message"), str):
+            elif (result.get("kind") == "visibility" and self._preview_window is None
+                  and self.goose_enabled() and isinstance(result.get("message"), str)):
                 self.status.emit(result["message"])
             elif result.get("kind") == "circle_screen" and self.goose_enabled():
                 self.circle_requested.emit()
@@ -203,19 +236,24 @@ class DesktopGoose(QObject):
     def _handle_error(self, error):
         if not self._stopping and error == QProcess.ProcessError.FailedToStart:
             self._ready = False
-            self._preview_pending = False
+            self._reported_error = True
+            self._clear_preview()
             self.status.emit("The desktop pet helper could not start. Check the Windows .NET Framework installation.")
 
-    def _finished(self, *_result):
+    def _finished(self, exit_code, _exit_status):
+        self._read_output()
         was_ready = self._ready
         self._ready = False
         self._last_config = None
-        if was_ready and not self._stopping:
-            self.status.emit("The desktop pet helper exited. Save Desktop Pet settings to restart it.")
+        self._clear_preview()
+        if not self._stopping and not self._reported_error:
+            when = "during startup" if not was_ready else "while running"
+            self.status.emit(f"The desktop pet helper exited {when} (0x{exit_code & 0xFFFFFFFF:08X}). "
+                             "Try Preview Goose again.")
 
     def _stop(self):
         self._ask_pending = False
-        self._preview_pending = False
+        self._clear_preview()
         if self.process.state() == QProcess.ProcessState.NotRunning:
             return
         self._stopping = True

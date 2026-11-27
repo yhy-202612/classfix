@@ -19,6 +19,7 @@ namespace ClassroomGoose
         public bool DebugAlwaysShow { get; set; }
         public bool Paused { get; set; }
         public bool Slideshow { get; set; }
+        public long Window { get; set; }
     }
 
     internal static class Program
@@ -39,6 +40,7 @@ namespace ClassroomGoose
 
                     stage = "initializing Windows graphics";
                     Native.SetProcessDPIAware();
+                    Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
 
@@ -56,22 +58,20 @@ namespace ClassroomGoose
                         app.CircleRequested += () => Send(output, json, "circle_screen", "");
                         app.VisibilityChanged += message => Send(output, json, "visibility", message);
                         var ignored = dispatcher.Handle;
-                        EventHandler ready = null;
-                        ready = delegate
+                        Action<HostMessage> preview = command =>
+                            Send(output, json, "preview", app.Preview(new IntPtr(command.Window)));
+                        dispatcher.BeginInvoke(new MethodInvoker(delegate
                         {
-                            Application.Idle -= ready;
                             Send(output, json, "ready", settings.Goose ? app.VisibilityStatus : "Touch keyboard helper is ready.");
-                            var reader = new Thread(() => Listen(input, json, app, dispatcher))
+                            var reader = new Thread(() => Listen(input, app, dispatcher, preview))
                             {
                                 IsBackground = true,
                                 Name = "EveTech desktop pet commands"
                             };
                             reader.Start();
-                        };
-                        Application.Idle += ready;
+                        }));
                         stage = "running the desktop pet";
-                        try { Application.Run(app); }
-                        finally { Application.Idle -= ready; }
+                        Application.Run(app);
                     }
                 }
                 catch (Exception error)
@@ -97,10 +97,11 @@ namespace ClassroomGoose
                    ", 0x" + error.HResult.ToString("X8") + component + ").";
         }
 
-        private static void Listen(StreamReader input, JavaScriptSerializer json, GooseApplication app, Control dispatcher)
+        private static void Listen(StreamReader input, GooseApplication app, Control dispatcher, Action<HostMessage> preview)
         {
             try
             {
+                var json = new JavaScriptSerializer { MaxJsonLength = 16384 };
                 HostMessage command;
                 while ((command = Read(input, json)) != null)
                 {
@@ -113,7 +114,10 @@ namespace ClassroomGoose
                     else if (command.Action == "ask")
                         dispatcher.BeginInvoke(new MethodInvoker(app.OpenFromHost));
                     else if (command.Action == "preview")
-                        dispatcher.BeginInvoke(new MethodInvoker(app.Preview));
+                    {
+                        HostMessage current = command;
+                        dispatcher.BeginInvoke(new MethodInvoker(() => preview(current)));
+                    }
                 }
             }
             catch (IOException) { }

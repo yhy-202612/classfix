@@ -68,13 +68,46 @@ class DesktopGooseTest(unittest.TestCase):
         settings = {}
         controller = DesktopGoose(settings, lambda: AIConfig("", ""), executable=Path("unused"))
         self.addCleanup(controller.deleteLater)
+        self.addCleanup(controller._clear_preview)
         controller._send = Mock()
         controller._ready = True
         controller.preview()
         controller._send.assert_not_called()
         settings["desktop_goose_enabled"] = "1"
-        controller.preview()
-        controller._send.assert_called_once_with({"Action": "preview"})
+        controller.preview(123)
+        controller._send.assert_called_once_with({"Action": "preview", "Window": 123})
+
+    def test_preview_reports_a_helper_that_runs_without_answering(self):
+        controller = DesktopGoose({"desktop_goose_enabled": "1"}, lambda: AIConfig("", ""))
+        self.addCleanup(controller.deleteLater)
+        self.addCleanup(controller._clear_preview)
+        controller._ready = True
+        controller._send = Mock()
+        seen = []
+        controller.status.connect(seen.append)
+        controller.preview(123)
+        self.assertIn("Requesting", seen[-1])
+        self.assertTrue(controller._preview_wait.isActive())
+        controller._preview_timeout()
+        self.assertIsNone(controller._preview_window)
+        self.assertIn("did not answer", seen[-1])
+
+    def test_preview_acknowledgement_ends_the_wait(self):
+        controller = DesktopGoose({"desktop_goose_enabled": "1"}, lambda: AIConfig("", ""))
+        self.addCleanup(controller.deleteLater)
+        self.addCleanup(controller._clear_preview)
+        controller.process = Mock()
+        controller.process.readAllStandardOutput.return_value = (
+            b'{"kind":"visibility","message":"This is not a preview reply."}\n'
+            b'{"kind":"preview","message":"Desktop Goose preview is active."}\n'
+        )
+        controller._ready = True
+        seen = []
+        controller.status.connect(seen.append)
+        controller.preview(123)
+        controller._read_output()
+        self.assertEqual(seen[-1], "Desktop Goose preview is active.")
+        self.assertFalse(controller._preview_wait.isActive())
 
     def test_slideshow_signal_does_not_need_a_video_or_window_handle(self):
         watcher = PowerPointWatcher(lambda: "")

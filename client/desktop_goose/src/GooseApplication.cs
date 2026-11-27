@@ -48,6 +48,8 @@ namespace ClassroomGoose
         private AnswerCard card;
         private Reply latest;
         private IntPtr returnFocus;
+        private IntPtr previewHost;
+        private Rectangle previewWork;
         internal event Action CircleRequested;
         internal event Action<string> VisibilityChanged;
         internal string VisibilityStatus { get; private set; }
@@ -108,7 +110,7 @@ namespace ClassroomGoose
         private bool Previewing { get { return previewClock.IsRunning && previewClock.Elapsed.TotalSeconds < 30; } }
         private bool InSchedule { get { return Schedule.IsOpen(DateTime.Now, weekends, debugAlwaysShow || Previewing); } }
         private bool CanAppear { get { return goose != null && enabled && InSchedule && !paused && !fullScreen; } }
-        private Rectangle Work { get { return Screen.PrimaryScreen.WorkingArea; } }
+        private Rectangle Work { get { return Previewing ? previewWork : Screen.PrimaryScreen.WorkingArea; } }
 
         internal void Configure(HostMessage value)
         {
@@ -142,11 +144,33 @@ namespace ClassroomGoose
             ShowChat(nearGoose ? goose.Beak : Cursor.Position, nearGoose);
         }
 
-        internal void Preview()
+        internal string Preview(IntPtr window)
         {
-            if (enabled && goose != null && !paused) previewClock.Restart();
+            if (!enabled || goose == null || paused || slideshow || Native.SlideshowWindow() != IntPtr.Zero ||
+                Native.IsFullScreen(ownPid, window))
+            {
+                ApplyPolicy();
+                return VisibilityStatus;
+            }
+            previewHost = window;
+            previewWork = (window == IntPtr.Zero ? Screen.PrimaryScreen : Screen.FromHandle(window)).WorkingArea;
+            previewClock.Restart();
             ApplyPolicy();
-            if (VisibilityChanged != null) VisibilityChanged(VisibilityStatus);
+            if (CanAppear && (!pet.Visible || !Work.Contains(goose.Position)))
+            {
+                StopDelivery(CanRetainDelivery());
+                int x = Work.Right - Math.Min(160, Work.Width / 2);
+                goose.ResetPosition(new Point(x, WalkY()), false);
+                pet.UpdatePose(Work);
+                ChooseWander();
+                motion.Start();
+            }
+            if (CanAppear && pet.Visible)
+            {
+                Native.RaiseWithoutFocus(pet.Handle);
+                pet.Update();
+            }
+            return VisibilityStatus;
         }
 
         private void UpdateVisibilityStatus(string message)
@@ -175,7 +199,17 @@ namespace ClassroomGoose
         {
             IntPtr slide = Native.SlideshowWindow();
             bool presenting = slideshow || slide != IntPtr.Zero;
-            fullScreen = presenting || Native.IsFullScreen(ownPid);
+            fullScreen = presenting || Native.IsFullScreen(ownPid, Previewing ? previewHost : IntPtr.Zero);
+            // After a preview on another display, resume the normal primary-screen route.
+            if (!Previewing && previewClock.IsRunning)
+            {
+                previewClock.Reset();
+                if (previewWork != Work && !presenting)
+                {
+                    StopDelivery(CanRetainDelivery());
+                    HideGoose();
+                }
+            }
             keyboard.FollowFocus();
             if (chat.Visible)
             {

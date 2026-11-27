@@ -383,7 +383,7 @@ def main():
     desktop_goose = DesktopGoose(window.settings_values, preferences.config, window)
     window.desktop_goose = desktop_goose
     desktop_goose.status.connect(preferences.goose_status.setText)
-    preferences.goose_preview.clicked.connect(desktop_goose.preview)
+    preferences.goose_preview.clicked.connect(lambda: desktop_goose.preview(window.winId()))
     window.watcher.slideshow_changed.connect(desktop_goose.set_slideshow)
     app.aboutToQuit.connect(desktop_goose.shutdown)
     app.aboutToQuit.connect(window.watcher.shutdown)
