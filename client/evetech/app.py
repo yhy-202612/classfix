@@ -212,13 +212,16 @@ def create_window(directory=None):
     def runtime_changed(values):
         if values.get("media_etw") == "0":
             diagnostics.cancel_trace()
-        watcher.set_threshold(values["low_volume_threshold"])
-        watcher.set_enabled(values["monitor_enabled"] != "0")
         tray = getattr(window, "tray", None)
-        if tray and tray.monitor_action.isChecked() != (values["monitor_enabled"] != "0"):
-            tray.monitor_action.blockSignals(True)
-            tray.monitor_action.setChecked(values["monitor_enabled"] != "0")
-            tray.monitor_action.blockSignals(False)
+        if "low_volume_threshold" in values:
+            watcher.set_threshold(values["low_volume_threshold"])
+        if "monitor_enabled" in values:
+            monitor_enabled = values["monitor_enabled"] != "0"
+            watcher.set_enabled(monitor_enabled)
+            if tray and tray.monitor_action.isChecked() != monitor_enabled:
+                tray.monitor_action.blockSignals(True)
+                tray.monitor_action.setChecked(monitor_enabled)
+                tray.monitor_action.blockSignals(False)
         desktop_goose = getattr(window, "desktop_goose", None)
         if desktop_goose is not None:
             if tray is not None and tray.goose_enabled_action is not None:

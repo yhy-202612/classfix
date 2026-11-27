@@ -12,6 +12,7 @@ from .. import cloud
 from .. import delta
 from ..ai import AIConfig, AIError, FEEDBACK, analyze, evidence, validate_config
 from ..desktop_goose import DEEPSEEK_MODEL, DEEPSEEK_URL, original_goose_available, resolve_goose_folder
+from ..goose_install import GOOSE_PAGE, GooseInstallError, install_goose
 from ..pptx import find_ffprobe
 from ..startup import set_startup, startup_enabled
 from ..update import (UpdateError, download, fetch_manifest, install_root, last_update_failure,
@@ -113,7 +114,13 @@ class SettingsPage(Page):
         row.addWidget(button("Choose folder…", self.choose_goose))
         content.addLayout(row)
         actions = horizontal()
-        actions.addWidget(button("Get Desktop Goose", self.download_goose, "link"))
+        self.goose_download = button("Download & Set Up", self.download_goose, "primary")
+        self.goose_import = button("Import Goose ZIP…", self.import_goose, "link")
+        actions.addWidget(self.goose_download)
+        actions.addWidget(self.goose_import)
+        content.addLayout(actions)
+        actions = horizontal()
+        actions.addWidget(button("Official itch.io page", lambda: QDesktopServices.openUrl(QUrl(GOOSE_PAGE)), "link"))
         actions.addWidget(button("Configure DeepSeek…", self.use_deepseek, "link"))
         actions.addStretch()
         actions.addWidget(button("Save Settings", self.save_goose))
@@ -563,7 +570,44 @@ class SettingsPage(Page):
         self.goose_status.setText("Desktop Goose v0.31 was found. Click Save Settings to enable it.")
 
     def download_goose(self):
-        QDesktopServices.openUrl(QUrl("https://samperson.itch.io/desktop-goose"))
+        self.setup_goose()
+
+    def import_goose(self):
+        archive, _ = QFileDialog.getOpenFileName(self, "Choose the official Desktop Goose Windows ZIP",
+                                                  "", "ZIP archives (*.zip)")
+        if archive:
+            self.setup_goose(archive)
+
+    def setup_goose(self, archive=None):
+        self.goose_download.setEnabled(False)
+        self.goose_import.setEnabled(False)
+        self.goose_status.setText("Checking the original ZIP…" if archive else "Downloading Desktop Goose from itch.io…")
+
+        def operation():
+            try:
+                return str(install_goose(archive)), ""
+            except GooseInstallError as error:
+                return "", str(error)
+
+        def finished(result):
+            folder, error = result
+            self.goose_download.setEnabled(True)
+            self.goose_import.setEnabled(True)
+            if error:
+                self.goose_status.setText(error)
+                return
+            values = {"desktop_goose_folder": folder, "desktop_goose_enabled": "1"}
+            if not self.save_values(values):
+                self.goose_status.setText("Desktop Goose was downloaded, but EveTech could not save its settings.")
+                return
+            self.values.update(values)
+            self.goose_folder.setText(folder)
+            self.goose_enabled.setChecked(True)
+            self.goose_status.setText("Desktop Goose is installed. Click Preview Goose to try it.")
+            if self.on_runtime_changed:
+                self.on_runtime_changed(values)
+
+        run_job(operation, finished, lambda name: finished(("", "Desktop Goose setup failed (" + name + ").")))
 
     def use_deepseek(self):
         key, accepted = QInputDialog.getText(self, "DeepSeek for Desktop Goose",

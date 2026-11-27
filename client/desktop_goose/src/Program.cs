@@ -71,9 +71,21 @@ namespace ClassroomGoose
                 }
                 catch (Exception error)
                 {
-                    Send(output, json, "error", "The desktop pet helper could not start (" + error.GetType().Name + ").");
+                    Send(output, json, "error", StartupError(error));
                 }
             }
+        }
+
+        private static string StartupError(Exception error)
+        {
+            while (error.InnerException != null &&
+                   (error is TargetInvocationException || error is TypeInitializationException))
+                error = error.InnerException;
+            if (error is FileLoadException && error.HResult == unchecked((int)0x80131515))
+                return "Windows blocked a downloaded Desktop Goose file (0x80131515). " +
+                       "Open Desktop Pet and click Download & Set Up, or import the official Windows ZIP.";
+            return "The desktop pet helper could not start (" + error.GetType().Name +
+                   ", 0x" + error.HResult.ToString("X8") + ").";
         }
 
         private static void Listen(StreamReader input, JavaScriptSerializer json, GooseApplication app, Control dispatcher)

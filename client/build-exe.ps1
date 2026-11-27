@@ -57,4 +57,9 @@ if ($FFprobeBundle) {
 
 & $Python (Join-Path $PSScriptRoot 'tools\write_package_meta.py') $output
 if ($LASTEXITCODE -ne 0) { throw 'Package metadata failed.' }
+& $Python -m PyInstaller --noconfirm --onefile --console --noupx --name EveTechGooseSetup --icon $icon `
+    --version-file $versionFile --paths $PSScriptRoot --distpath $Destination --workpath $BuildDirectory `
+    --specpath $BuildDirectory (Join-Path $PSScriptRoot 'goose_setup.py')
+if ($LASTEXITCODE -ne 0) { throw 'Desktop Goose downloader build failed.' }
 Write-Output (Join-Path $Destination 'EveTech\EveTech.exe')
+Write-Output (Join-Path $Destination 'EveTechGooseSetup.exe')

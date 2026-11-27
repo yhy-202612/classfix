@@ -1,4 +1,4 @@
-# EveTech 1.6.8
+# EveTech 1.6.9
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
@@ -87,7 +87,8 @@ EveTech 的检测为只读。修复由教师通过 PowerPoint 或 Windows 设置
 
 ### Desktop Goose and touch keyboard
 
-- In Settings, open **Desktop Pet**, choose the extracted Windows Desktop Goose v0.31 folder, select **Enable Desktop Goose**, and click **Save Settings**. After setup, right-click the EveTech tray icon and select **Enable Desktop Goose** to turn the pet on or off immediately. This setting is saved across restarts. The **Desktop Goose** submenu offers **Ask Goose**, **Pause Desktop Goose**, and **Desktop Pet Settings…**. [Official Desktop Goose download](https://samperson.itch.io/desktop-goose)
+- In Settings, open **Desktop Pet** and select **Download & Set Up**. EveTech downloads the original Windows v0.31 ZIP directly from itch.io, verifies it, and enables the goose for your Windows account. If you already have the original ZIP, use **Import Goose ZIP…** or run `EveTechGooseSetup.exe` with that ZIP as its argument. You can also run the downloader by itself and confirm the download. Restart EveTech after using the standalone downloader. [Official Desktop Goose download](https://samperson.itch.io/desktop-goose)
+- If Windows reports a downloaded file is blocked, select **Download & Set Up** or **Import Goose ZIP…** to install a verified copy. After setup, the EveTech tray menu has **Enable Desktop Goose** and a **Desktop Goose** submenu with **Ask Goose**, **Pause Desktop Goose**, and **Desktop Pet Settings…**.
 - The goose roams quietly during school breaks, eye exercises, group exercises, and lunch break. It walks offscreen when the next class starts. The schedule applies on weekdays by default. **Debug mode: ignore the school schedule** lets the goose roam any time, including weekends.
 - Select **Preview Goose** in **Desktop Pet** to see it for 30 seconds on the primary display outside school hours. The status below the button reports schedule, manual pause, full-screen, or setup issues.
 - When a PowerPoint slideshow starts, the goose walks into a small straw nest on the slideshow display. Drag the nest to move it without taking keyboard focus from PowerPoint. The goose follows the new position while walking. **Pause Desktop Goose** hides the nest and the goose.
@@ -106,7 +107,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build-exe.ps1 `
 
 这里的执行策略参数仅用于该次构建进程。`-FFprobeBundle` 接受已解压的 FFmpeg 目录，脚本会复制 `ffprobe.exe`、同目录 DLL 和许可证。可使用 `-Python`、`-Destination` 和 `-BuildDirectory` 覆盖路径。再次构建时可选择新的目标目录。将整个 `dist\EveTech` 压缩后分发。面向校内批量部署时，可由学校按自身流程为构建签名。 [Qt 的 PyInstaller 打包文档](https://doc.qt.io/qtforpython-6/deployment/deployment-pyinstaller.html)
 
-To build the Desktop Goose helper, add `-DesktopGooseFolder C:\path\to\DesktopGoose-v0.31`. The script builds against the original Mod SDK with the .NET Framework C# compiler and installs the helper in `tools`. Get the original program and assets from the official download.
+To build the Desktop Goose helper, add `-DesktopGooseFolder C:\path\to\DesktopGoose-v0.31`. The script builds against the original Mod SDK with the .NET Framework C# compiler and installs the helper in `tools`. The same build produces the standalone `dist\EveTechGooseSetup.exe` downloader. The original Desktop Goose program and assets are distributed through the author's official download.
 
 打包脚本还会做两件事：用 `tools\make_version_info.py` 依据 `evetech.VERSION` 生成版本资源（右键 exe → 属性 可看到版本号，不会与代码里的版本号走偏），并写入 `evetech-package.json`，供「从文件更新」识别包版本。
 
@@ -175,6 +176,11 @@ $run.ExitCode
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.6.9
+
+- Added **Download & Set Up**, **Import Goose ZIP…**, and a standalone Desktop Goose downloader.
+- Desktop Goose startup errors report the Windows/.NET error code and show how to reinstall when downloaded files are blocked.
 
 ### 1.6.8
 

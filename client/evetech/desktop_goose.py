@@ -1,6 +1,5 @@
 """Manage the local EveTech desktop pet and touch keyboard helper."""
 
-import hashlib
 import json
 import sys
 import ctypes
@@ -9,30 +8,12 @@ from urllib.parse import urlsplit
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, Signal
 
+from .goose_install import original_goose_available
 from .update import install_root
 
 
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_MODEL = "deepseek-flash"
-_STOCK_FILES = {
-    "GooseDesktop.exe": "943fd1ea44266c5d7fa02f2b292db095a4e6ba8027a1f6c73fd60d1165e63aff",
-    "GooseModdingAPI.dll": "efa31df7ab1394092395365805f913dd023cdcd21796603f133641524fb9ad79",
-}
-
-
-def original_goose_available(folder):
-    if not folder:
-        return False
-    root = Path(folder)
-    try:
-        for name, expected in _STOCK_FILES.items():
-            with (root / name).open("rb") as stream:
-                content = stream.read(256 * 1024 + 1)
-            if hashlib.sha256(content).hexdigest() != expected:
-                return False
-        return (root / "Assets" / "Sound" / "NotEmbedded" / "Honk1.mp3").is_file()
-    except (OSError, ValueError):
-        return False
 
 
 def resolve_goose_folder(folder):
