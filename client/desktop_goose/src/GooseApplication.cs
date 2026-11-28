@@ -15,23 +15,16 @@ namespace ClassroomGoose
 
         private readonly int ownPid = Process.GetCurrentProcess().Id;
         private readonly IGoose goose;
-        private readonly GooseWindow pet;
         private readonly NestWindow nest;
         private readonly ChatWindow chat;
         private readonly TouchKeyboard keyboard;
         private DeepSeek api;
         private readonly HotkeyWindow hotkey;
         private readonly Timer policy = new Timer { Interval = 180 };
-        private readonly Timer motion = new Timer { Interval = 16 };
-        private readonly Stopwatch motionClock = Stopwatch.StartNew();
         private readonly Stopwatch previewClock = new Stopwatch();
-        private readonly Random random = new Random();
         
         private Motion phase;
         private Point target;
-        private DateTime restUntil;
-        private double carrySeconds;
-        private double lastFrame;
         private bool enabled;
         private bool paused;
         private bool slideshow;
@@ -54,14 +47,14 @@ namespace ClassroomGoose
         internal event Action<string> VisibilityChanged;
         internal string VisibilityStatus { get; private set; }
 
-        internal GooseApplication(string originalFolder, HostMessage configuration)
+        internal GooseApplication(IGoose original, HostMessage configuration)
         {
-            if (originalFolder != null)
+            if (original != null)
             {
-                goose = LoadGoose(originalFolder);
-                pet = new GooseWindow(goose);
+                goose = original;
+                goose.Frame += Advance;
                 nest = new NestWindow(goose);
-                pet.Tapped += point =>
+                goose.Tapped += point =>
                 {
                     if (CanAppear && phase != Motion.Delivering && phase != Motion.Fetching)
                         ShowChat(point, true);
@@ -82,6 +75,7 @@ namespace ClassroomGoose
             chat.ClosingBubble += () => keyboard.EndOwnInput(chat.Handle);
             chat.BubbleHidden += () =>
             {
+                if (heldForChat && phase == Motion.Wandering) goose.Wander();
                 heldForChat = false;
                 if (returnFocus != IntPtr.Zero && OwnForeground())
                     Native.SetForegroundWindow(returnFocus);
@@ -96,15 +90,8 @@ namespace ClassroomGoose
             hotkey = new HotkeyWindow(OpenFromHost);
 
             policy.Tick += delegate { ApplyPolicy(); };
-            motion.Tick += delegate { Advance(); };
             Configure(configuration);
             policy.Start();
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static IGoose LoadGoose(string folder)
-        {
-            return new StockGoose(folder);
         }
 
         private bool Previewing { get { return previewClock.IsRunning && previewClock.Elapsed.TotalSeconds < 30; } }
@@ -139,7 +126,7 @@ namespace ClassroomGoose
         internal void OpenFromHost()
         {
             if (!enabled) return;
-            bool nearGoose = CanAppear && pet != null && pet.Visible &&
+            bool nearGoose = CanAppear && goose.Visible &&
                              phase != Motion.Delivering && phase != Motion.Fetching;
             ShowChat(nearGoose ? goose.Beak : Cursor.Position, nearGoose);
         }
@@ -156,19 +143,14 @@ namespace ClassroomGoose
             previewWork = (window == IntPtr.Zero ? Screen.PrimaryScreen : Screen.FromHandle(window)).WorkingArea;
             previewClock.Restart();
             ApplyPolicy();
-            if (CanAppear && (!pet.Visible || !Work.Contains(goose.Position)))
+            if (CanAppear && (!goose.Visible || !Work.Contains(goose.Position)))
             {
                 StopDelivery(CanRetainDelivery());
                 int x = Work.Right - Math.Min(160, Work.Width / 2);
+                goose.TargetScreen(Work);
                 goose.ResetPosition(new Point(x, WalkY()), false);
-                pet.UpdatePose(Work);
+                goose.Show();
                 ChooseWander();
-                motion.Start();
-            }
-            if (CanAppear && pet.Visible)
-            {
-                Native.RaiseWithoutFocus(pet.Handle);
-                pet.Update();
             }
             return VisibilityStatus;
         }
@@ -227,11 +209,12 @@ namespace ClassroomGoose
             if (presenting && enabled && !paused)
             {
                 var screen = slide != IntPtr.Zero ? Screen.FromHandle(slide) : Screen.PrimaryScreen;
+                goose.TargetScreen(screen.Bounds);
                 nest.ShowOn(screen.Bounds);
                 if (phase != Motion.WalkingToNest && phase != Motion.RestingInNest)
                 {
                     StopDelivery(CanRetainDelivery());
-                    if (!pet.Visible)
+                    if (!goose.Visible)
                     {
                         Point rest = nest.RestPoint;
                         Rectangle bounds = screen.Bounds;
@@ -240,7 +223,7 @@ namespace ClassroomGoose
                                                       rest.Y), fromLeft);
                     }
                     StartMotion(Motion.WalkingToNest);
-                    if (pet.Visible) Native.RaiseWithoutFocus(pet.Handle);
+                    goose.Show();
                 }
                 UpdateVisibilityStatus(phase == Motion.RestingInNest
                     ? "Desktop Goose is resting in its PowerPoint nest."
@@ -276,85 +259,51 @@ namespace ClassroomGoose
 
             if (phase == Motion.Hidden || phase == Motion.Departing)
             {
+                goose.TargetScreen(Work);
                 if (phase == Motion.Hidden)
                     goose.ResetPosition(Outside(true), false);
+                goose.Show();
                 target = new Point(Work.Right - 125, WalkY());
                 StartMotion(Motion.Entering);
             }
             UpdateVisibilityStatus(Previewing ? "Desktop Goose preview is active for 30 seconds."
-                : pet.Visible ? "Desktop Goose is visible on the primary display."
+                : goose.Visible ? "Desktop Goose is visible on the primary display."
                 : "Desktop Goose is walking in from the right edge of the primary display.");
         }
 
-        private void StartMotion(Motion next)
-        {
-            phase = next;
-            lastFrame = motionClock.Elapsed.TotalSeconds;
-            carrySeconds = 0;
-            motion.Start();
-        }
+        private void StartMotion(Motion next) { phase = next; }
 
         private bool CanRetainDelivery() { return InSchedule && card != null && phase == Motion.Delivering; }
 
         private void Advance()
         {
             if (phase == Motion.Hidden || phase == Motion.RestingInNest) return;
-            const double step = 1.0 / 120;
-            double now = motionClock.Elapsed.TotalSeconds;
-            carrySeconds += Math.Min(.07, now - lastFrame);
-            lastFrame = now;
-            // Timer ticks without a movement step must not reset the wander pause.
-            if (carrySeconds < step) return;
-            bool arrived = false;
-            Point destination = phase == Motion.WalkingToNest ? nest.RestPoint : target;
-            while (carrySeconds >= step)
-            {
-                arrived = goose.Move(heldForChat ? goose.Position : destination, phase == Motion.Delivering);
-                carrySeconds -= step;
-            }
 
-            if (phase == Motion.WalkingToNest)
+            if (heldForChat)
             {
-                if (arrived)
-                {
-                    nest.Settle();
-                    pet.Hide();
-                    phase = Motion.RestingInNest;
-                    motion.Stop();
-                }
-                else
-                {
-                    pet.UpdatePose(Screen.FromPoint(goose.Position).Bounds);
-                    if (pet.Visible) Native.RaiseWithoutFocus(pet.Handle);
-                }
+                goose.Move(goose.Position, false);
                 return;
             }
-
-            if (phase == Motion.Delivering && card != null)
-                card.Follow(goose.Beak, fromRight, Work);
-            pet.UpdatePose(Work);
-            if (phase == Motion.Delivering && pet.Visible && card != null && card.Visible)
-                Native.RaiseWithoutFocus(pet.Handle);
-
-            if (heldForChat) return;
             if (phase == Motion.Wandering)
             {
-                if (pendingDelivery && CanAppear)
-                    TryBeginDelivery();
-                else if (!arrived)
-                    restUntil = DateTime.MinValue;
-                else if (restUntil == DateTime.MinValue)
-                    restUntil = DateTime.UtcNow.AddSeconds(random.Next(1, 4));
-                else if (DateTime.UtcNow >= restUntil)
-                    ChooseWander();
+                if (pendingDelivery && CanAppear) TryBeginDelivery();
                 return;
             }
 
+            Point destination = phase == Motion.WalkingToNest ? nest.RestPoint : target;
+            bool arrived = goose.Move(destination, phase == Motion.Delivering);
+            if (phase == Motion.Delivering && card != null) card.Follow(goose.Beak, fromRight, Work);
             if (!arrived) return;
+
             switch (phase)
             {
                 case Motion.Entering: ChooseWander(); break;
                 case Motion.Departing: HideGoose(); break;
+                case Motion.WalkingToNest:
+                    nest.Settle();
+                    goose.Hide();
+                    phase = Motion.RestingInNest;
+                    break;
                 case Motion.Fetching: StartDrag(); break;
                 case Motion.Delivering:
                     if (card != null)
@@ -369,13 +318,8 @@ namespace ClassroomGoose
 
         private void ChooseWander()
         {
-            var work = Work;
-            int padding = Math.Min(work.Width / 4, 90);
-            int lane = Math.Min(work.Width - padding, Math.Max(padding + 1, 370));
-            target = new Point(work.Right - random.Next(padding, lane),
-                Math.Max(work.Top + 70, Math.Min(work.Bottom - 42, WalkY() + random.Next(-48, 70))));
             phase = Motion.Wandering;
-            restUntil = DateTime.MinValue;
+            goose.Wander();
         }
 
         private int WalkY()
@@ -435,8 +379,7 @@ namespace ClassroomGoose
         private void HideGoose()
         {
             phase = Motion.Hidden;
-            motion.Stop();
-            if (pet != null && pet.Visible) pet.Hide();
+            if (goose != null) goose.Hide();
         }
 
         private async void Submit(string question)
@@ -460,13 +403,13 @@ namespace ClassroomGoose
             latest = null;
             chat.ClearQuestion();
             chat.SetState(true, null);
-            chat.Dismiss(true);
             try
             {
                 var response = await AskDeepSeek(question, current.Token);
                 if (closed || request != current || current.IsCancellationRequested) return;
                 latest = response;
                 pendingDelivery = response.CanDeliver && mayDeliver && InSchedule && goose != null;
+                if (pendingDelivery && CanAppear) chat.Dismiss(true);
             }
             catch (OperationCanceledException) { }
             catch (Exception)
@@ -512,13 +455,13 @@ namespace ClassroomGoose
         {
             if (disposing)
             {
+                closed = true;
+                if (request != null) request.Cancel();
                 policy.Dispose();
-                motion.Dispose();
                 keyboard.Dispose();
                 hotkey.Dispose();
                 chat.Dispose();
                 CloseCard();
-                if (pet != null) pet.Dispose();
                 if (nest != null) nest.Dispose();
                 if (goose != null) goose.Dispose();
                 if (api != null) api.Dispose();

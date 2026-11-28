@@ -120,7 +120,8 @@ namespace ClassroomGoose
         protected override void OnPaint(PaintEventArgs e)
         {
             var graphics = e.Graphics;
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            // A color-key window must preserve the exact transparent color at its outer edge.
+            graphics.SmoothingMode = SmoothingMode.None;
             using (var edge = new Pen(Color.FromArgb(155, 105, 61), 2))
             using (var rim = new SolidBrush(Color.FromArgb(224, 177, 112)))
             using (var inside = new SolidBrush(Color.FromArgb(177, 124, 73)))

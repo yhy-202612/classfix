@@ -6,71 +6,13 @@ using System.Windows.Forms;
 
 namespace ClassroomGoose
 {
-    internal sealed class GooseWindow : Form
-    {
-        private readonly IGoose goose;
-        private Rectangle clip;
-        internal event Action<Point> Tapped;
-
-        internal GooseWindow(IGoose goose)
-        {
-            this.goose = goose;
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
-            FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = false;
-            TopMost = true;
-            StartPosition = FormStartPosition.Manual;
-            ClientSize = new Size(150, 134);
-            BackColor = Color.FromArgb(255, 0, 255);
-            TransparencyKey = BackColor;
-            AutoScaleMode = AutoScaleMode.None;
-            AccessibleName = "Ask Goose";
-        }
-
-        protected override bool ShowWithoutActivation { get { return true; } }
-
-        protected override CreateParams CreateParams
-        {
-            get
-            {
-                var parameters = base.CreateParams;
-                parameters.ExStyle |= Native.NoActivate | Native.ToolWindow;
-                return parameters;
-            }
-        }
-
-        internal void UpdatePose(Rectangle screen)
-        {
-            clip = screen;
-            Point at = goose.Position;
-            Location = new Point(at.X - 75, at.Y - 70);
-            if (!Bounds.IntersectsWith(screen))
-            {
-                Hide();
-                return;
-            }
-            if (!Visible) Show();
-            Invalidate();
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.TranslateTransform(-Left, -Top);
-            e.Graphics.SetClip(clip);
-            goose.Draw(e.Graphics);
-        }
-
-        protected override void OnMouseClick(MouseEventArgs e)
-        {
-            base.OnMouseClick(e);
-            if (e.Button == MouseButtons.Left && Tapped != null)
-                Tapped(goose.Beak);
-        }
-    }
-
     internal sealed class ChatWindow : Form
     {
+        private static readonly Color Paper = Color.FromArgb(255, 251, 242);
+        private static readonly Color Ink = Color.FromArgb(48, 37, 27);
+        private static readonly Color Toast = Color.FromArgb(244, 230, 209);
+        private static readonly Color Accent = Color.FromArgb(245, 176, 83);
+        private const int CompactHeight = 70;
         private readonly TextBox editor;
         private readonly Label status;
         private readonly RichTextBox answer;
@@ -110,14 +52,15 @@ namespace ClassroomGoose
             TopMost = true;
             Text = "EveTech · Ask Goose";
             KeyPreview = true;
-            BackColor = Color.FromArgb(252, 249, 241);
-            ClientSize = new Size(416, 110);
-            var title = new Label { Text = "Ask Goose", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Location = new Point(24, 14) };
-            var close = new Button { Text = "Close", Size = new Size(65, 34), Location = new Point(326, 9), TabStop = false };
+            BackColor = Paper;
+            ForeColor = Ink;
+            ClientSize = new Size(326, CompactHeight);
+            var close = ActionButton("×", new Rectangle(267, 14, 40, 42), Paper);
+            close.AccessibleName = "Close";
             close.Click += delegate { Dismiss(true); };
-            var circle = new Button { Text = "Circle Screen", Bounds = new Rectangle(24, 53, 177, 42) };
+            var circle = ActionButton("Circle Screen", new Rectangle(19, 14, 116, 42), Toast);
             circle.Click += delegate { if (!closing && CircleRequested != null) CircleRequested(); };
-            type = new Button { Text = "Type Question", Bounds = new Rectangle(211, 53, 179, 42) };
+            type = ActionButton("Type Question", new Rectangle(142, 14, 120, 42), Toast);
             type.Click += delegate
             {
                 if (closing) return;
@@ -129,22 +72,33 @@ namespace ClassroomGoose
             editor = new TextBox
             {
                 Multiline = true, AcceptsReturn = true, ScrollBars = ScrollBars.Vertical,
-                MaxLength = DeepSeek.QuestionLimit, Location = new Point(24, 108),
-                Width = 366, Height = 74, AccessibleName = "Question"
+                MaxLength = DeepSeek.QuestionLimit, Location = new Point(19, 73),
+                Width = 288, Height = 77, AccessibleName = "Question", ForeColor = Ink,
+                BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle
             };
-            status = new Label { Location = new Point(24, 192), Width = 260, Height = 49, AutoEllipsis = true };
-            send = new Button { Text = "Send", Location = new Point(312, 195), Size = new Size(78, 44) };
+            status = new Label { Location = new Point(19, 163), Width = 193, Height = 49, AutoEllipsis = true };
+            send = ActionButton("Send", new Rectangle(218, 158, 89, 44), Accent);
             send.Click += delegate { Submit(); };
-            cancel = new Button { Text = "Cancel", Location = new Point(298, 195), Size = new Size(92, 44), Visible = false };
+            cancel = ActionButton("Cancel", new Rectangle(218, 158, 89, 44), Toast);
             cancel.Click += delegate { if (CancellationRequested != null) CancellationRequested(); };
             answer = new RichTextBox
             {
                 ReadOnly = true, DetectUrls = false, WordWrap = true, ScrollBars = RichTextBoxScrollBars.Vertical,
-                AccessibleName = "Latest answer", Location = new Point(24, 246), Size = new Size(366, 124), Visible = false
+                AccessibleName = "Latest answer", Location = new Point(19, 215), Size = new Size(288, 114),
+                BackColor = Paper, ForeColor = Ink, BorderStyle = BorderStyle.None, Visible = false
             };
-            Controls.AddRange(new Control[] { title, close, circle, type, editor, status, send, cancel, answer });
+            Controls.AddRange(new Control[] { circle, type, close, editor, status, send, cancel, answer });
             UpdateContent(false);
             transition.Tick += delegate { Animate(); };
+        }
+
+        private static Button ActionButton(string text, Rectangle bounds, Color background)
+        {
+            var button = new Button { Text = text, Bounds = bounds, BackColor = background, ForeColor = Ink,
+                FlatStyle = FlatStyle.Flat, UseVisualStyleBackColor = false, Cursor = Cursors.Hand };
+            button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(250, 215, 163);
+            return button;
         }
 
         internal bool IsAttached { get { return attached; } }
@@ -192,7 +146,7 @@ namespace ClassroomGoose
             cancel.Visible = typing && waiting;
             bool hasAnswer = answer.TextLength != 0;
             answer.Visible = typing && hasAnswer;
-            int height = typing ? (hasAnswer ? 386 : 253) : 110;
+            int height = typing ? (hasAnswer ? 341 : 218) : CompactHeight;
             if (animate && ClientSize.Height != height && (!resizeAnimation.IsRunning || targetHeight != height))
             {
                 startHeight = ClientSize.Height;
@@ -227,7 +181,7 @@ namespace ClassroomGoose
                 UpdateShape();
             }
             int left = tailAtLeft ? right : anchor.X - Width - 16;
-            int top = anchor.Y - 46;
+            int top = anchor.Y - 35;
             left = Math.Max(work.Left + 6, Math.Min(work.Right - Width - 6, left));
             top = Math.Max(work.Top + 6, Math.Min(work.Bottom - Height - 6, top));
             if (blocked.IntersectsWith(new Rectangle(left, top, Width, Height)))
@@ -312,10 +266,12 @@ namespace ClassroomGoose
                 using (var tail = new GraphicsPath())
                 {
                     int side = tailAtLeft ? left : right;
-                    tail.AddPolygon(new[] { new Point(side, 34), new Point(tailAtLeft ? 0 : Width, 43), new Point(side, 54) });
+                    tail.AddPolygon(new[] { new Point(side, 26), new Point(tailAtLeft ? 0 : Width, 35), new Point(side, 44) });
                     shape.Union(tail);
                 }
+                var previous = Region;
                 Region = shape;
+                if (previous != null) previous.Dispose();
             }
         }
 

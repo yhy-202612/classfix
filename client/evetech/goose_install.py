@@ -30,6 +30,42 @@ class GooseInstallError(Exception):
     pass
 
 
+def prepare_classroom_goose(original, mod):
+    """Install just the verified runtime and EveTech's Mod into a private copy."""
+    if not original_goose_available(original):
+        raise GooseInstallError("Choose the extracted official Desktop Goose v0.31 folder.")
+    original = Path(original)
+    base = data_directory() / "desktop-goose"
+    runtime = None
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+        runtime = tempfile.TemporaryDirectory(prefix="classroom-", dir=base)
+        root = Path(runtime.name)
+        mod_folder = root / "Assets" / "Mods" / "EveTech"
+        mod_folder.mkdir(parents=True, exist_ok=True)
+        (root / "Assets" / "Images" / "Memes").mkdir(parents=True, exist_ok=True)
+        audio = Path("Assets", "Sound", "NotEmbedded", "Honk1.mp3")
+        (root / audio.parent).mkdir(parents=True, exist_ok=True)
+        pairs = [(original / name, root / name) for name in (*_STOCK_FILES, audio)]
+        pairs.append((mod, mod_folder / "EveTechGooseMod.dll"))
+        for source, target in pairs:
+            target.write_bytes(source.read_bytes())
+        if not original_goose_available(root):
+            raise OSError("The original binaries changed during setup.")
+        # The unapproved stock host can only wander while EveTech waits for the Mod.
+        (root / "config.ini").write_text(
+            "Version_DoNotEdit=1\nEnableMods=True\nSilenceSounds=True\n"
+            "Task_CanAttackMouse=False\nAttackRandomly=False\n"
+            "FirstWanderTimeSeconds=86400\nMinWanderingTimeSeconds=86400\nMaxWanderingTimeSeconds=86400\n",
+            encoding="ascii",
+        )
+        return runtime
+    except OSError as error:
+        if runtime is not None:
+            runtime.cleanup()
+        raise GooseInstallError("EveTech could not prepare its Desktop Goose Mod folder.") from error
+
+
 def original_goose_available(folder):
     if not folder:
         return False

@@ -406,7 +406,7 @@ def main():
         preferences.config, open_screenshot_ai_settings,
         lambda message: QMessageBox.warning(window, "截图问 AI", message),
     )
-    desktop_goose.circle_requested.connect(screenshot.start)
+    desktop_goose.circle_requested.connect(lambda: screenshot.start(english=True))
     window.bar_extra.insertWidget(0, button("截图问 AI", screenshot.start))
 
     def quit_application():
