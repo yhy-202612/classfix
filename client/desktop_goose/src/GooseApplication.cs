@@ -409,6 +409,7 @@ namespace ClassroomGoose
                 if (closed || request != current || current.IsCancellationRequested) return;
                 latest = response;
                 pendingDelivery = response.CanDeliver && mayDeliver && InSchedule && goose != null;
+                if (pendingDelivery && CanAppear) chat.Dismiss(true);
             }
             catch (OperationCanceledException) { }
             catch (Exception)
@@ -454,6 +455,8 @@ namespace ClassroomGoose
         {
             if (disposing)
             {
+                closed = true;
+                if (request != null) request.Cancel();
                 policy.Dispose();
                 keyboard.Dispose();
                 hotkey.Dispose();

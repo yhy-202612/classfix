@@ -4,7 +4,7 @@ import math
 from urllib.parse import urlsplit
 
 from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QPoint, QPointF, QRect, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QCursor, QImage, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QCursor, QImage, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QDialog, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
@@ -34,7 +34,7 @@ def crop_image(image, selection, display_size):
 class RegionPicker(QDialog):
     selected = Signal(QImage)
 
-    def __init__(self, screen, image):
+    def __init__(self, screen, image, english=False):
         super().__init__(None, Qt.WindowType.FramelessWindowHint | TOP_WINDOW)
         self.setWindowTitle(TITLE)
         self.winId()
@@ -44,20 +44,35 @@ class RegionPicker(QDialog):
         self.image = image
         self.origin = None
         self.region = QRect()
-        instructions = QLabel("拖动框选要截图的区域", self)
-        instructions.setStyleSheet("background: #202733; color: white; padding: 9px 16px; border-radius: 6px;")
-        instructions.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        cancel = QPushButton("取消", self)
-        cancel.setMinimumHeight(34)
+        self.move_from = QRect()
+        self.english = english
+        self.instructions = QLabel("Drag to select a region" if english else "拖动框选截图区域", self)
+        self.confirm = QPushButton("Use selection" if english else "使用此区域", self)
+        self.confirm.setProperty("role", "primary")
+        self.confirm.setEnabled(False)
+        self.confirm.setAutoDefault(False)
+        self.confirm.clicked.connect(self.use_selection)
+        QShortcut(QKeySequence("Return"), self, activated=self.use_selection)
+        cancel = QPushButton("Cancel" if english else "取消", self)
         cancel.setAutoDefault(False)
         cancel.clicked.connect(self.reject)
-        header = QHBoxLayout()
-        header.addStretch()
-        header.addWidget(instructions)
+        cancel.setMinimumHeight(40)
+        self.confirm.setMinimumHeight(40)
+        toolbar = QWidget(self)
+        toolbar.setObjectName("CaptureToolbar")
+        toolbar.setStyleSheet(
+            "QWidget#CaptureToolbar { background: #172433; border: 1px solid #43566d; border-radius: 14px; }"
+            "QWidget#CaptureToolbar QLabel { color: #f3f7fc; background: transparent; }"
+        )
+        header = QHBoxLayout(toolbar)
+        header.setContentsMargins(16, 8, 8, 8)
+        header.addWidget(self.instructions)
+        header.addSpacing(12)
         header.addWidget(cancel)
-        header.addStretch()
+        header.addWidget(self.confirm)
         layout = QVBoxLayout(self)
-        layout.addLayout(header)
+        layout.setContentsMargins(12, 14, 12, 12)
+        layout.addWidget(toolbar, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addStretch()
 
     def paintEvent(self, event):
@@ -69,22 +84,45 @@ class RegionPicker(QDialog):
             painter.setClipRect(self.region)
             painter.drawImage(self.rect(), self.image)
             painter.restore()
-            painter.setPen(QPen(QColor("#73b5ff"), 2))
+            painter.setPen(QPen(QColor("#8accff"), 2))
             painter.drawRect(self.region.adjusted(0, 0, -1, -1))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor("#d9f1ff"))
+            for corner in (self.region.topLeft(), self.region.topRight(),
+                           self.region.bottomLeft(), self.region.bottomRight()):
+                painter.drawEllipse(corner, 3, 3)
         painter.end()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.origin = event.position().toPoint()
-            self.region = QRect()
+            self.move_from = QRect(self.region) if self.region.contains(self.origin) else QRect()
+            if not self.region.isEmpty():
+                corners = (self.region.topLeft(), self.region.topRight(),
+                           self.region.bottomLeft(), self.region.bottomRight())
+                for index, corner in enumerate(corners):
+                    if (self.origin - corner).manhattanLength() <= 9:
+                        self.origin = corners[3 - index]
+                        self.move_from = QRect()
+                        break
+            if self.move_from.isEmpty():
+                self.region = QRect()
+            self.confirm.setEnabled(False)
             self.update()
 
     def mouseMoveEvent(self, event):
         if self.origin is not None:
             end = event.position().toPoint()
-            top_left = QPoint(min(self.origin.x(), end.x()), min(self.origin.y(), end.y()))
-            bottom_right = QPoint(max(self.origin.x(), end.x()), max(self.origin.y(), end.y()))
-            self.region = QRect(top_left, bottom_right).intersected(self.rect())
+            if self.move_from.isEmpty():
+                top_left = QPoint(min(self.origin.x(), end.x()), min(self.origin.y(), end.y()))
+                bottom_right = QPoint(max(self.origin.x(), end.x()), max(self.origin.y(), end.y()))
+                self.region = QRect(top_left, bottom_right).intersected(self.rect())
+            else:
+                self.region = self.move_from.translated(end - self.origin)
+                self.region.moveTopLeft(QPoint(
+                    max(0, min(self.region.left(), self.width() - self.region.width())),
+                    max(0, min(self.region.top(), self.height() - self.region.height())),
+                ))
             self.update()
 
     def mouseReleaseEvent(self, event):
@@ -92,9 +130,18 @@ class RegionPicker(QDialog):
             return
         self.mouseMoveEvent(event)
         self.origin = None
-        if self.region.width() < 4 or self.region.height() < 4:
+        valid = self.region.width() >= 4 and self.region.height() >= 4
+        self.confirm.setEnabled(valid)
+        if not valid:
             self.region = QRect()
-            self.update()
+        self.instructions.setText(
+            ("Move or redraw the selection" if self.english else "可移动或重新框选")
+            if valid else ("Drag to select a region" if self.english else "拖动框选截图区域")
+        )
+        self.update()
+
+    def use_selection(self):
+        if not self.confirm.isEnabled():
             return
         image = crop_image(self.image, self.region, self.size())
         self.accept()
@@ -104,7 +151,7 @@ class RegionPicker(QDialog):
 class AnnotationCanvas(QWidget):
     history_changed = Signal(bool)
 
-    def __init__(self, image, parent):
+    def __init__(self, image, parent, english=False):
         super().__init__(parent)
         if max(image.width(), image.height()) > MAX_IMAGE_EDGE:
             image = image.scaled(MAX_IMAGE_EDGE, MAX_IMAGE_EDGE, ASPECT, SMOOTH)
@@ -113,7 +160,7 @@ class AnnotationCanvas(QWidget):
         self.drawing = False
         self.setCursor(Qt.CursorShape.CrossCursor)
         self.setMinimumSize(220, 160)
-        self.setAccessibleName("截图标注区")
+        self.setAccessibleName("Screenshot annotation" if english else "截图标注区")
         self.pen = QPen(QColor("#e72a3f"), max(3, min(image.width(), image.height()) / 100),
                         Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
 
@@ -171,6 +218,12 @@ class AnnotationCanvas(QWidget):
             self.history_changed.emit(bool(self.strokes))
             self.update()
 
+    def clear(self):
+        self.drawing = False
+        self.strokes.clear()
+        self.history_changed.emit(False)
+        self.update()
+
     def to_png(self):
         composed = QImage(self.image.size(), QImage.Format.Format_RGB888)
         painter = QPainter(composed)
@@ -187,19 +240,24 @@ class AnnotationCanvas(QWidget):
 
 
 class ScreenshotQuestion(QDialog):
-    def __init__(self, image, config, on_retake, open_ai_settings):
+    def __init__(self, image, config, on_retake, open_ai_settings, english=False):
         super().__init__(None, Qt.WindowType.Window)
         self.config = config
+        self.english = english
         self.closed = False
         self.finished.connect(self._mark_closed)
-        self.setWindowTitle(f"EveTech · {TITLE}")
+        tr = self._text
+        self.setWindowTitle("EveTech · " + tr(TITLE, "Circle Screen"))
         layout = QVBoxLayout(self)
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("在截图上拖动圈画要问的地方"), 1)
-        self.undo = QPushButton("撤销圈画")
+        toolbar.addWidget(QLabel(tr("圈出要提问的地方", "Mark the part you want to ask about")), 1)
+        self.undo = QPushButton(tr("撤销", "Undo"))
         self.undo.setEnabled(False)
         toolbar.addWidget(self.undo)
-        self.retake = QPushButton("重新截图")
+        self.clear = QPushButton(tr("清空圈画", "Clear marks"))
+        self.clear.setEnabled(False)
+        toolbar.addWidget(self.clear)
+        self.retake = QPushButton(tr("重新截图", "Retake"))
 
         def retake():
             self.reject()
@@ -210,32 +268,35 @@ class ScreenshotQuestion(QDialog):
         layout.addLayout(toolbar)
 
         row = QHBoxLayout()
-        self.canvas = AnnotationCanvas(image, self)
+        self.canvas = AnnotationCanvas(image, self, english)
         self.canvas.history_changed.connect(self.undo.setEnabled)
+        self.canvas.history_changed.connect(self.clear.setEnabled)
         self.undo.clicked.connect(self.canvas.undo)
+        self.clear.clicked.connect(self.canvas.clear)
+        QShortcut(QKeySequence.StandardKey.Undo, self.canvas, activated=self.canvas.undo)
         row.addWidget(self.canvas, 5)
         details = QVBoxLayout()
         self.question = QPlainTextEdit()
-        self.question.setAccessibleName("问题")
-        self.question.setPlaceholderText("例如：圈出的这一步为什么成立？")
+        self.question.setAccessibleName(tr("问题", "Question"))
+        self.question.setPlaceholderText(tr("圈出的这一步为什么成立？", "Why does the circled step work?"))
         self.question.setMaximumHeight(100)
         details.addWidget(self.question)
-        self.status = QLabel("确认后仅发送这张截图和你的问题。")
+        self.status = QLabel(tr("确认后仅发送这张截图和你的问题。", "Review the screenshot and your question before sending."))
         self.status.setWordWrap(True)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         details.addWidget(self.status)
         buttons = QHBoxLayout()
-        settings = QPushButton("AI 设置")
+        settings = QPushButton(tr("AI 设置", "AI settings"))
         settings.clicked.connect(open_ai_settings)
-        self.send = QPushButton("发送截图和问题")
+        self.send = QPushButton(tr("发送截图和问题", "Send screenshot"))
         self.send.setProperty("role", "primary")
         self.send.clicked.connect(self.submit)
         buttons.addWidget(settings)
         buttons.addWidget(self.send, 1)
         details.addLayout(buttons)
         self.answer = QPlainTextEdit()
-        self.answer.setAccessibleName("AI 回答")
-        self.answer.setPlaceholderText("AI 回答会显示在这里")
+        self.answer.setAccessibleName(tr("AI 回答", "AI answer"))
+        self.answer.setPlaceholderText(tr("AI 回答会显示在这里", "The answer will appear here."))
         self.answer.setReadOnly(True)
         details.addWidget(self.answer, 1)
         row.addLayout(details, 3)
@@ -246,10 +307,14 @@ class ScreenshotQuestion(QDialog):
     def _mark_closed(self):
         self.closed = True
 
+    def _text(self, chinese, english):
+        return english if self.english else chinese
+
     def submit(self):
+        tr = self._text
         question = self.question.toPlainText().strip()
         if not question or len(question) > SCREENSHOT_QUESTION_LIMIT:
-            self.status.setText("请输入 1 到 2000 个字符的问题。")
+            self.status.setText(tr("请输入 1 到 2000 个字符的问题。", "Enter a question of 1–2,000 characters."))
             self.question.setFocus()
             return
         config = self.config()
@@ -260,15 +325,17 @@ class ScreenshotQuestion(QDialog):
             if url.hostname == "api.deepseek.com" and not config.token:
                 raise AIError("请在 AI 设置中填写 DeepSeek API 密钥并保存。")
         except AIError as error:
-            self.status.setText(str(error))
+            self.status.setText(tr(str(error), "Check your model, endpoint and API key in AI settings."))
             return
         confirm = QMessageBox(self)
-        confirm.setWindowTitle("确认发送截图")
+        confirm.setWindowTitle(tr("确认发送截图", "Confirm screenshot sharing"))
         confirm.setTextFormat(Qt.TextFormat.PlainText)
-        confirm.setText(f"将预览中的截图和问题发送给 {target}（模型 {config.model}）。")
-        confirm.setInformativeText("请确认截图中没有你不想分享的内容。")
-        send = confirm.addButton("发送", QMessageBox.ButtonRole.AcceptRole)
-        cancel = confirm.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        confirm.setText(tr(f"将预览中的截图和问题发送给 {target}（模型 {config.model}）。",
+                           f"Send the previewed screenshot and question to {target} ({config.model})?"))
+        confirm.setInformativeText(tr("请确认截图中没有你不想分享的内容。",
+                                      "Check the preview for anything you want to keep private."))
+        send = confirm.addButton(tr("发送", "Send"), QMessageBox.ButtonRole.AcceptRole)
+        cancel = confirm.addButton(tr("取消", "Cancel"), QMessageBox.ButtonRole.RejectRole)
         confirm.setDefaultButton(cancel)
         confirm.exec()
         if confirm.clickedButton() != send:
@@ -277,24 +344,25 @@ class ScreenshotQuestion(QDialog):
         try:
             png = self.canvas.to_png()
         except AIError as error:
-            self.status.setText(str(error))
+            self.status.setText(tr(str(error), "Could not encode the image. Retake the screenshot."))
             return
-        self.status.setText("正在等待 AI 回答…")
+        self.status.setText(tr("正在等待 AI 回答…", "Waiting for an answer…"))
         self.answer.clear()
         self.send.setEnabled(False)
         self.retake.setEnabled(False)
         self.canvas.setEnabled(False)
         self.undo.setEnabled(False)
+        self.clear.setEnabled(False)
         self.question.setReadOnly(True)
 
         def operation():
             try:
                 return True, ask_screenshot(config, question, png)
             except AIError as error:
-                return False, str(error)
+                return False, tr(str(error), "The AI request failed. Check your settings or try again.")
 
         run_job(operation, lambda result: self._completed(*result),
-                lambda _name: self._completed(False, "请求未完成，请重试。"))
+                lambda _name: self._completed(False, tr("请求未完成，请重试。", "The request did not complete. Try again.")))
 
     def _completed(self, success, text):
         if self.closed:
@@ -303,8 +371,9 @@ class ScreenshotQuestion(QDialog):
         self.retake.setEnabled(True)
         self.canvas.setEnabled(True)
         self.undo.setEnabled(bool(self.canvas.strokes))
+        self.clear.setEnabled(bool(self.canvas.strokes))
         self.question.setReadOnly(False)
-        self.status.setText("已收到回答。" if success else text)
+        self.status.setText(self._text("已收到回答。", "Answer received.") if success else text)
         if success:
             self.answer.setPlainText(text)
 
@@ -318,7 +387,7 @@ class ScreenshotTool:
         self.screen = None
         self.pending = False
 
-    def start(self, *, screen=None):
+    def start(self, *, screen=None, english=False):
         if self.dialog is not None:
             self.dialog.raise_()
             self.dialog.activateWindow()
@@ -326,6 +395,7 @@ class ScreenshotTool:
         if self.pending:
             return
         self.screen = screen or QApplication.screenAt(QCursor.pos()) or QApplication.primaryScreen()
+        self.english = english
         self.pending = True
         # Let the tray context menu disappear before grabbing pixels.
         QTimer.singleShot(180, self.capture)
@@ -341,7 +411,7 @@ class ScreenshotTool:
             return
         image = pixels.toImage()
         image.setDevicePixelRatio(1)
-        picker = RegionPicker(self.screen, image)
+        picker = RegionPicker(self.screen, image, self.english)
         picker.selected.connect(self.preview)
         self.track(picker)
         picker.showFullScreen()
@@ -350,7 +420,9 @@ class ScreenshotTool:
 
     def preview(self, image):
         screen = self.screen
-        dialog = ScreenshotQuestion(image, self.config, lambda: self.start(screen=screen), self.open_ai_settings)
+        english = self.english
+        dialog = ScreenshotQuestion(image, self.config, lambda: self.start(screen=screen, english=english),
+                                    self.open_ai_settings, english)
         area = screen.availableGeometry()
         dialog.resize(min(1040, area.width() - 32), min(620, area.height() - 48))
         dialog.move(area.center() - QPoint(dialog.width() // 2, dialog.height() // 2))

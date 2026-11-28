@@ -129,6 +129,10 @@ class DesktopGoose(QObject):
             self._clear_preview()
             self.status.emit("The desktop pet helper is missing. Extract the complete EveTech Windows package.")
             return
+        if self.goose_enabled() and not self.executable.with_name("EveTechGooseMod.dll").is_file():
+            self._clear_preview()
+            self.status.emit("The classroom Goose Mod is missing. Extract the complete EveTech package.")
+            return
         folder = self.settings.get("desktop_goose_folder", "") if self.goose_enabled() else ""
         if self.process.state() != QProcess.ProcessState.NotRunning and folder != self._folder:
             pending = self._ask_pending, self._preview_window

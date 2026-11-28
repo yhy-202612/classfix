@@ -55,6 +55,12 @@ class ScreenshotTest(unittest.TestCase):
         QTest.mousePress(picker, Qt.MouseButton.LeftButton, pos=QPoint(170, 160))
         QTest.mouseMove(picker, QPoint(70, 60), 5)
         QTest.mouseRelease(picker, Qt.MouseButton.LeftButton, pos=QPoint(70, 60))
+        self.assertEqual(crops, [])
+        QTest.mousePress(picker, Qt.MouseButton.LeftButton, pos=QPoint(120, 110))
+        QTest.mouseMove(picker, QPoint(132, 127), 5)
+        QTest.mouseRelease(picker, Qt.MouseButton.LeftButton, pos=QPoint(132, 127))
+        self.assertEqual(picker.region.topLeft(), QPoint(82, 77))
+        picker.confirm.click()
         self.assertEqual(len(crops), 1)
         self.assertEqual(crops[0].size(), QSize(101, 101))
 
