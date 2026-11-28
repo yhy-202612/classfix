@@ -24,7 +24,11 @@ user.EnumWindows.argtypes = (callback, wintypes.LPARAM)
 user.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
 user.GetWindowRect.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.RECT))
 user.IsWindowVisible.argtypes = (wintypes.HWND,)
+user.PostMessageW.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
 user.SetProcessDPIAware()
+dwm = ctypes.WinDLL("dwmapi")
+dwm.DwmGetWindowAttribute.argtypes = (wintypes.HWND, wintypes.DWORD,
+                                      ctypes.POINTER(wintypes.RECT), wintypes.DWORD)
 report = Path(os.environ["QA_REPORT"])
 report.mkdir(parents=True, exist_ok=True)
 stock_exe_sha = "943fd1ea44266c5d7fa02f2b292db095a4e6ba8027a1f6c73fd60d1165e63aff"
@@ -94,6 +98,14 @@ def orange_over_note(screenshot, note, from_right):
     return sum(r >= 240 and 135 <= g <= 190 and b <= 50 for r, g, b in strip.getdata())
 
 
+def visible_note_frame(note):
+    frame = wintypes.RECT()
+    # Extended frame bounds exclude the invisible DWM margins in GetWindowRect.
+    if dwm.DwmGetWindowAttribute(note, 9, ctypes.byref(frame), ctypes.sizeof(frame)) == 0:
+        return frame.left, frame.top, frame.right, frame.bottom
+    return win32gui.GetWindowRect(note)
+
+
 def check_stock_delivery():
     original = Path(os.environ["EVETECH_DATA_DIR"]) / "desktop-goose" / "v0.31"
     assert hashlib.sha256((original / "GooseDesktop.exe").read_bytes()).hexdigest() == stock_exe_sha
@@ -108,18 +120,23 @@ def check_stock_delivery():
         )
         process = subprocess.Popen([str(folder / "GooseDesktop.exe")], cwd=folder)
         try:
+            goose = wait_for(lambda: next((hwnd for hwnd in stock_windows(process.pid)
+                                          if win32gui.GetWindowRect(hwnd)[2] > 500), None), 8)
+            assert goose, "Stock Desktop Goose did not start"
+            assert win32gui.GetWindowLong(goose, win32con.GWL_EXSTYLE) & win32con.WS_EX_TOPMOST
+            display_left, _, display_right, _ = win32gui.GetWindowRect(goose)
             for _ in range(4):
-                goose = wait_for(lambda: next((hwnd for hwnd in stock_windows(process.pid)
-                                              if win32gui.GetWindowRect(hwnd)[2] > 500), None), 8)
-                assert goose, "Stock Desktop Goose did not start"
-                display_left, _, display_right, _ = win32gui.GetWindowRect(goose)
                 side = None
                 blocked = None
                 clear = None
                 deadline = time.monotonic() + 25
                 previous = None
+                move_start = None
                 while time.monotonic() < deadline:
                     note = win32gui.FindWindow(None, notepad_title)
+                    for popup in stock_windows(process.pid):
+                        if popup not in (goose, note):
+                            user.PostMessageW(popup, win32con.WM_CLOSE, 0, 0)
                     if note and win32gui.IsWindowVisible(note):
                         rect = win32gui.GetWindowRect(note)
                         left, _, right, _ = rect
@@ -130,22 +147,22 @@ def check_stock_delivery():
                             if right > display_right:
                                 side = True
                             visible_width = min(right, display_right) - max(left, display_left)
-                            if side is not None and visible_width >= 65:
+                            if side is not None and visible_width >= 95:
                                 above = is_above(goose, note)
                                 desktop = ImageGrab.grab(include_layered_windows=True)
-                                orange = orange_over_note(desktop, rect, side)
+                                orange = orange_over_note(desktop, visible_note_frame(note), side)
                                 frame = (desktop, rect, orange)
+                                move_start = move_start or time.monotonic()
                                 if above:
                                     clear = frame
-                                else:
+                                elif blocked is None or orange < blocked[2]:
                                     blocked = frame
-                                if blocked:
+                                if blocked and time.monotonic() - move_start >= 0.35:
                                     break
                         previous = rect
                     time.sleep(0.025)
                 chosen = blocked or clear
                 if chosen:
-                    assert win32gui.GetWindowLong(goose, win32con.GWL_EXSTYLE) & win32con.WS_EX_TOPMOST
                     chosen[0].save(report / "preview-stock-drag.png")
                     print(f"Stock v0.31, both windows topmost. Note above goose: {blocked is not None}. "
                           f"Note bounds: {chosen[1]}. Orange beak pixels crossing note edge: {chosen[2]}.",
@@ -254,7 +271,7 @@ def check_text_delivery(window, preview, child_pid):
                     assert is_above(goose, note), "Not-epad covered the goose while dragging"
                     assert win32gui.GetForegroundWindow() != note, "Delivering the note took keyboard focus"
                     if from_right is not None and effective_width >= 105:
-                        orange = orange_over_note(screenshot, (left, top, right, bottom), from_right)
+                        orange = orange_over_note(screenshot, visible_note_frame(note), from_right)
                         if orange > best_beak:
                             best_beak = orange
                             screenshot.save(report / "preview-notepad-drag.png")
@@ -280,6 +297,7 @@ def check_text_delivery(window, preview, child_pid):
     print(f"Goose stayed above the note while dragging; {best_beak} orange beak pixels overlap its edge.",
           flush=True)
     win32gui.PostMessage(note, win32con.WM_CLOSE, 0, 0)
+    assert wait_for(lambda: not win32gui.IsWindow(note), 5), "The delivered note could not be closed"
 
 
 def main():
@@ -382,6 +400,8 @@ def main():
             time.sleep(.12)
         frames[0].save(report / "preview-walk.gif", save_all=True, append_images=frames[1:],
                        duration=140, loop=0, optimize=True)
+        control(window, "Debug mode: ignore the school schedule").click_input()
+        control(window, "Save Settings").click_input()
         check_text_delivery(window, preview, child.pid)
         print("Native goose, chat and Circle Screen all passed.", flush=True)
     except Exception:
