@@ -1,4 +1,4 @@
-# EveTech 1.7.0
+# EveTech 1.7.1
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
@@ -177,6 +177,11 @@ $run.ExitCode
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.7.1
+
+- **Type Question** uses the original Desktop Goose Not-epad task. The goose walks off-screen, fetches the text reply, and drags the original Not-epad window onto the desktop. The reply is selectable and can be copied after delivery.
+- **Circle Screen** displays its answer in the screenshot window.
 
 ### 1.7.0
 

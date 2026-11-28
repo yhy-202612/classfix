@@ -116,6 +116,13 @@ namespace ClassroomGoose
             SetWindowLong(window, extendedStyle, clickThrough ? style | Transparent : style & ~Transparent);
         }
 
+        internal static void SetWindowActivation(IntPtr window, bool allow)
+        {
+            const int extendedStyle = -20;
+            int style = GetWindowLong(window, extendedStyle);
+            SetWindowLong(window, extendedStyle, allow ? style & ~NoActivate : style | NoActivate);
+        }
+
         internal static IntPtr SlideshowWindow()
         {
             IntPtr slide = GetForegroundWindow();

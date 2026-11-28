@@ -11,7 +11,7 @@ namespace ClassroomGoose
 {
     internal sealed class GooseApplication : ApplicationContext
     {
-        private enum Motion { Hidden, Entering, Wandering, Departing, Fetching, Delivering, WalkingToNest, RestingInNest }
+        private enum Motion { Hidden, Entering, Wandering, Departing, Delivering, WalkingToNest, RestingInNest }
 
         private readonly int ownPid = Process.GetCurrentProcess().Id;
         private readonly IGoose goose;
@@ -31,14 +31,12 @@ namespace ClassroomGoose
         private bool weekends;
         private bool debugAlwaysShow;
         private bool fullScreen;
-        private bool fromRight;
         private bool pendingDelivery;
         private bool closed;
         private bool heldForChat;
         private bool captureAfterClose;
         private string apiKey;
         private CancellationTokenSource request;
-        private AnswerCard card;
         private Reply latest;
         private IntPtr returnFocus;
         private IntPtr previewHost;
@@ -56,7 +54,7 @@ namespace ClassroomGoose
                 nest = new NestWindow(goose);
                 goose.Tapped += point =>
                 {
-                    if (CanAppear && phase != Motion.Delivering && phase != Motion.Fetching)
+                    if (CanAppear && phase != Motion.Delivering)
                         ShowChat(point, true);
                 };
             }
@@ -126,8 +124,7 @@ namespace ClassroomGoose
         internal void OpenFromHost()
         {
             if (!enabled) return;
-            bool nearGoose = CanAppear && goose.Visible &&
-                             phase != Motion.Delivering && phase != Motion.Fetching;
+            bool nearGoose = CanAppear && goose.Visible && phase != Motion.Delivering;
             ShowChat(nearGoose ? goose.Beak : Cursor.Position, nearGoose);
         }
 
@@ -273,7 +270,7 @@ namespace ClassroomGoose
 
         private void StartMotion(Motion next) { phase = next; }
 
-        private bool CanRetainDelivery() { return InSchedule && card != null && phase == Motion.Delivering; }
+        private bool CanRetainDelivery() { return InSchedule && phase == Motion.Delivering && goose.IsBringingNotepad; }
 
         private void Advance()
         {
@@ -281,7 +278,16 @@ namespace ClassroomGoose
 
             if (heldForChat)
             {
-                goose.Move(goose.Position, false);
+                goose.Move(goose.Position);
+                return;
+            }
+            if (phase == Motion.Delivering)
+            {
+                if (!goose.IsBringingNotepad)
+                {
+                    goose.FinishNotepad();
+                    phase = Motion.Wandering;
+                }
                 return;
             }
             if (phase == Motion.Wandering)
@@ -291,9 +297,7 @@ namespace ClassroomGoose
             }
 
             Point destination = phase == Motion.WalkingToNest ? nest.RestPoint : target;
-            bool arrived = goose.Move(destination, phase == Motion.Delivering);
-            if (phase == Motion.Delivering && card != null) card.Follow(goose.Beak, fromRight, Work);
-            if (!arrived) return;
+            if (!goose.Move(destination)) return;
 
             switch (phase)
             {
@@ -303,15 +307,6 @@ namespace ClassroomGoose
                     nest.Settle();
                     goose.Hide();
                     phase = Motion.RestingInNest;
-                    break;
-                case Motion.Fetching: StartDrag(); break;
-                case Motion.Delivering:
-                    if (card != null)
-                    {
-                        card.Release();
-                        goose.Honk();
-                    }
-                    ChooseWander();
                     break;
             }
         }
@@ -338,42 +333,15 @@ namespace ClassroomGoose
         {
             pendingDelivery = false;
             if (latest == null || !latest.CanDeliver || Work.Width < 460 || Work.Height < 350) return;
-            CloseCard();
-            fromRight = goose.Position.X >= Work.Left + Work.Width / 2;
-            phase = Motion.Fetching;
-            target = Outside(fromRight);
-        }
-
-        private void StartDrag()
-        {
-            if (!CanAppear || latest == null || !latest.CanDeliver)
-            {
-                ChooseWander();
-                return;
-            }
-            Rectangle area = Work;
-            card = new AnswerCard(latest.Text, area.Size);
-            card.FormClosed += delegate { card = null; };
-            int margin = card.Width + 42;
-            int y = Math.Min(WalkY(), area.Bottom - card.Height + AnswerCard.GripHeight - 19);
-            target = new Point(fromRight ? area.Right - margin : area.Left + margin, y);
+            goose.BringNotepad(latest.Text, Work);
             phase = Motion.Delivering;
         }
 
         private void StopDelivery(bool keep)
         {
-            if (keep || (phase == Motion.Fetching && InSchedule))
-                pendingDelivery = latest != null && latest.CanDeliver;
+            if (keep) pendingDelivery = latest != null && latest.CanDeliver;
             if (!InSchedule) pendingDelivery = false;
-            CloseCard();
-        }
-
-        private void CloseCard()
-        {
-            if (card == null) return;
-            var previous = card;
-            card = null;
-            previous.Dispose();
+            goose.CloseNotepad();
         }
 
         private void HideGoose()
@@ -394,9 +362,6 @@ namespace ClassroomGoose
 
             bool mayDeliver = enabled && InSchedule;
             pendingDelivery = false;
-            CloseCard();
-            if (phase == Motion.Fetching || phase == Motion.Delivering)
-                ChooseWander();
 
             var current = new CancellationTokenSource();
             request = current;
@@ -408,7 +373,8 @@ namespace ClassroomGoose
                 var response = await AskDeepSeek(question, current.Token);
                 if (closed || request != current || current.IsCancellationRequested) return;
                 latest = response;
-                pendingDelivery = response.CanDeliver && mayDeliver && InSchedule && goose != null;
+                pendingDelivery = response.CanDeliver && mayDeliver && InSchedule && goose != null &&
+                                  Work.Width >= 460 && Work.Height >= 350;
                 if (pendingDelivery && CanAppear) chat.Dismiss(true);
             }
             catch (OperationCanceledException) { }
@@ -461,7 +427,6 @@ namespace ClassroomGoose
                 keyboard.Dispose();
                 hotkey.Dispose();
                 chat.Dispose();
-                CloseCard();
                 if (nest != null) nest.Dispose();
                 if (goose != null) goose.Dispose();
                 if (api != null) api.Dispose();
