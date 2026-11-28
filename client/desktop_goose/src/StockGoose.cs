@@ -197,7 +197,7 @@ namespace ClassroomGoose
         {
             CloseNotepad();
             API.Goose.setCurrentTaskByID(goose, "CollectNotepad", false);
-            notepad = new NotepadDelivery(goose.currentTaskData, answer, work, origin);
+            notepad = new NotepadDelivery(goose.currentTaskData, answer, work, origin, form.Handle);
         }
 
         public bool IsBringingNotepad

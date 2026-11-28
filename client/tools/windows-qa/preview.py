@@ -4,8 +4,10 @@ import hashlib
 from ctypes import wintypes
 from pathlib import Path
 import os
+from shutil import copytree
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 import time
 
 from PIL import ImageChops, ImageGrab
@@ -25,6 +27,8 @@ user.IsWindowVisible.argtypes = (wintypes.HWND,)
 user.SetProcessDPIAware()
 report = Path(os.environ["QA_REPORT"])
 report.mkdir(parents=True, exist_ok=True)
+stock_exe_sha = "943fd1ea44266c5d7fa02f2b292db095a4e6ba8027a1f6c73fd60d1165e63aff"
+notepad_title = 'Goose "Not-epad"'
 
 
 def wait_for(read, timeout=15):
@@ -71,6 +75,101 @@ def pet_bounds(pid):
 
     user.EnumWindows(collect, 0)
     return positions
+
+
+def is_above(window, other):
+    while other:
+        other = win32gui.GetWindow(other, win32con.GW_HWNDPREV)
+        if other == window:
+            return True
+    return False
+
+
+def orange_over_note(screenshot, note, from_right):
+    left, top, right, bottom = note
+    edge = left if from_right else right
+    middle = (top + bottom) // 2
+    strip = screenshot.crop((edge - (0 if from_right else 9), middle - 10,
+                             edge + (9 if from_right else 0), middle + 10)).convert("RGB")
+    return sum(r >= 240 and 135 <= g <= 190 and b <= 50 for r, g, b in strip.getdata())
+
+
+def check_stock_delivery():
+    original = Path(os.environ["EVETECH_DATA_DIR"]) / "desktop-goose" / "v0.31"
+    assert hashlib.sha256((original / "GooseDesktop.exe").read_bytes()).hexdigest() == stock_exe_sha
+    with TemporaryDirectory() as tmp:
+        folder = copytree(original, Path(tmp) / "stock")
+        # Accelerate idle between pranks and keep the cursor and audio undisturbed.
+        (folder / "config.ini").write_text(
+            "Version_DoNotEdit=1\nEnableMods=False\nSilenceSounds=True\n"
+            "Task_CanAttackMouse=False\nAttackRandomly=False\n"
+            "FirstWanderTimeSeconds=0.5\nMinWanderingTimeSeconds=0.5\nMaxWanderingTimeSeconds=0.8\n",
+            encoding="ascii",
+        )
+        process = subprocess.Popen([str(folder / "GooseDesktop.exe")], cwd=folder)
+        try:
+            for _ in range(4):
+                goose = wait_for(lambda: next((hwnd for hwnd in stock_windows(process.pid)
+                                              if win32gui.GetWindowRect(hwnd)[2] > 500), None), 8)
+                assert goose, "Stock Desktop Goose did not start"
+                display_left, _, display_right, _ = win32gui.GetWindowRect(goose)
+                side = None
+                blocked = None
+                clear = None
+                deadline = time.monotonic() + 25
+                previous = None
+                while time.monotonic() < deadline:
+                    note = win32gui.FindWindow(None, notepad_title)
+                    if note and win32gui.IsWindowVisible(note):
+                        rect = win32gui.GetWindowRect(note)
+                        left, _, right, _ = rect
+                        note_topmost = win32gui.GetWindowLong(note, win32con.GWL_EXSTYLE) & win32con.WS_EX_TOPMOST
+                        if note_topmost and previous != rect:
+                            if left < display_left:
+                                side = False
+                            if right > display_right:
+                                side = True
+                            visible_width = min(right, display_right) - max(left, display_left)
+                            if side is not None and visible_width >= 65:
+                                above = is_above(goose, note)
+                                desktop = ImageGrab.grab(include_layered_windows=True)
+                                orange = orange_over_note(desktop, rect, side)
+                                frame = (desktop, rect, orange)
+                                if above:
+                                    clear = frame
+                                else:
+                                    blocked = frame
+                                if blocked:
+                                    break
+                        previous = rect
+                    time.sleep(0.025)
+                chosen = blocked or clear
+                if chosen:
+                    assert win32gui.GetWindowLong(goose, win32con.GWL_EXSTYLE) & win32con.WS_EX_TOPMOST
+                    chosen[0].save(report / "preview-stock-drag.png")
+                    print(f"Stock v0.31, both windows topmost. Note above goose: {blocked is not None}. "
+                          f"Note bounds: {chosen[1]}. Orange beak pixels crossing note edge: {chosen[2]}.",
+                          flush=True)
+                    return
+            raise RuntimeError("Could not capture the unmodified goose dragging a stock Not-epad")
+        finally:
+            process.terminate()
+            process.wait(timeout=10)
+
+
+def stock_windows(pid):
+    windows = []
+
+    @callback
+    def collect(hwnd, lparam):
+        owner = wintypes.DWORD()
+        user.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user.IsWindowVisible(hwnd):
+            windows.append(hwnd)
+        return True
+
+    user.EnumWindows(collect, 0)
+    return windows
 
 
 def visible_goose(pid, before):
@@ -130,13 +229,17 @@ def check_text_delivery(window, preview, child_pid):
     editor = bubble.descendants(control_type="Edit")[0]
     editor.set_edit_text("Why does 2x + 6 = 14 become 2x = 8?")
     ImageGrab.grab(include_layered_windows=True).save(report / "preview-text-question.png")
-    note_title = 'Goose "Not-epad" · Answer'
+    note_title = notepad_title + " · Answer"
     assert not win32gui.FindWindow(None, note_title), "A note appeared before sending a question"
     control(bubble, "Send").click_input()
 
     display = pet_bounds(child_pid)[0]
+    goose = win32gui.FindWindow(None, "EveTech · Desktop Goose")
+    assert goose, "The original goose window was missing"
     entering = None
     settled = None
+    from_right = None
+    best_beak = 0
     frames = []
     start = time.monotonic()
     while time.monotonic() - start < 30:
@@ -147,10 +250,17 @@ def check_text_delivery(window, preview, child_pid):
             if effective_width > 0:
                 screenshot = ImageGrab.grab(include_layered_windows=True)
                 frames.append(screenshot.resize((768, 576)))
+                if win32gui.GetWindowLong(note, win32con.GWL_EXSTYLE) & 0x08000000:
+                    assert is_above(goose, note), "Not-epad covered the goose while dragging"
+                    assert win32gui.GetForegroundWindow() != note, "Delivering the note took keyboard focus"
+                    if from_right is not None and effective_width >= 105:
+                        orange = orange_over_note(screenshot, (left, top, right, bottom), from_right)
+                        if orange > best_beak:
+                            best_beak = orange
+                            screenshot.save(report / "preview-notepad-drag.png")
                 if entering is None and 45 < effective_width < right - left - 45:
                     entering = (left, top, right, bottom)
-                    screenshot.save(report / "preview-notepad-drag.png")
-                    assert win32gui.GetForegroundWindow() != note, "Delivering the note took keyboard focus"
+                    from_right = right > display[2]
                 if not win32gui.GetWindowLong(note, win32con.GWL_EXSTYLE) & 0x08000000:
                     if effective_width == right - left:
                         settled = (left, top, right, bottom)
@@ -161,11 +271,14 @@ def check_text_delivery(window, preview, child_pid):
     assert entering is not None, "Did not see a Not-epad window crossing the display edge"
     assert settled is not None, "The original Not-epad did not finish delivery inside the display"
     assert abs(entering[0] - settled[0]) > 45, "The note did not move from its entry point"
+    assert best_beak >= 4, "The orange beak was not visible across the edge of the note"
     reply = Desktop(backend="uia").window(handle=note).descendants(control_type="Edit")[0]
     assert "Subtract 6 from both sides" in reply.get_value(), "The note did not contain the text answer"
     frames[0].save(report / "preview-notepad-walk.gif", save_all=True, append_images=frames[1:],
                    duration=140, loop=0, optimize=True)
     print(f"Original Not-epad crossed the edge {entering} and landed {settled} with the text answer.", flush=True)
+    print(f"Goose stayed above the note while dragging; {best_beak} orange beak pixels overlap its edge.",
+          flush=True)
     win32gui.PostMessage(note, win32con.WM_CLOSE, 0, 0)
 
 
@@ -182,9 +295,7 @@ def main():
             raise RuntimeError("Original Desktop Goose did not ask to enable its Mod")
         control(prompt, "Yes").click_input()
         original = next(p for p in psutil.Process(child.pid).children() if p.name().lower() == "goosedesktop.exe")
-        assert hashlib.sha256(Path(original.exe()).read_bytes()).hexdigest() == (
-            "943fd1ea44266c5d7fa02f2b292db095a4e6ba8027a1f6c73fd60d1165e63aff"
-        )
+        assert hashlib.sha256(Path(original.exe()).read_bytes()).hexdigest() == stock_exe_sha
         window.set_focus()
         settings = wait_for(lambda: control(window, "\u8bbe\u7f6e"))
         if not settings:
@@ -206,6 +317,8 @@ def main():
                                    if "outside the school schedule" in text.casefold()], 35)
         if not ready:
             raise RuntimeError(f"The helper did not reach idle before the test: {desktop_pet_status(window)!r}")
+        check_stock_delivery()
+        window.set_focus()
         time.sleep(2)
         before = ImageGrab.grab(include_layered_windows=True).convert("RGB")
         before.save(report / "before-preview.png")

@@ -1,4 +1,4 @@
-# EveTech 1.7.1
+# EveTech 1.7.2
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
@@ -177,6 +177,10 @@ $run.ExitCode
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.7.2
+
+- The goose stays above the Not-epad while dragging it, so its beak remains visible at the edge of the window.
 
 ### 1.7.1
 

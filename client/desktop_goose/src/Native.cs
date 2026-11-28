@@ -13,13 +13,23 @@ namespace ClassroomGoose
         internal const int Transparent = 0x00000020;
         private const uint NoMove = 0x0002;
         private const uint NoSize = 0x0001;
+        private const uint NoZOrder = 0x0004;
         private const uint NoActivatePosition = 0x0010;
+        internal const int WindowPositionChanging = 0x0046;
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct Rect
         {
             internal int Left, Top, Right, Bottom;
             internal Rectangle Bounds { get { return Rectangle.FromLTRB(Left, Top, Right, Bottom); } }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WindowPosition
+        {
+            internal IntPtr Window, InsertAfter;
+            internal int X, Y, Width, Height;
+            internal uint Flags;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -107,6 +117,19 @@ namespace ClassroomGoose
         internal static void RaiseWithoutFocus(IntPtr window)
         {
             SetWindowPos(window, new IntPtr(-1), 0, 0, 0, 0, NoMove | NoSize | NoActivatePosition);
+        }
+
+        internal static void KeepBehind(IntPtr placement, IntPtr front)
+        {
+            var position = (WindowPosition)Marshal.PtrToStructure(placement, typeof(WindowPosition));
+            if ((position.Flags & NoZOrder) != 0) return;
+            position.InsertAfter = front;
+            Marshal.StructureToPtr(position, placement, false);
+        }
+
+        internal static void PlaceBehindWithoutFocus(IntPtr window, IntPtr front)
+        {
+            SetWindowPos(window, front, 0, 0, 0, 0, NoMove | NoSize | NoActivatePosition);
         }
 
         internal static void SetGooseWindowStyle(IntPtr window, bool clickThrough)

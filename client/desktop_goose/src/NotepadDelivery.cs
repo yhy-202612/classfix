@@ -12,13 +12,14 @@ namespace ClassroomGoose
         private readonly Form window;
         private readonly FieldInfo stage;
         private readonly Rectangle work;
+        private DragLayer dragLayer;
         private volatile bool closed;
         private volatile bool closing;
         private bool released;
 
         internal GooseTaskData Task { get; private set; }
 
-        internal NotepadDelivery(GooseTaskData task, string answer, Rectangle work, Point origin)
+        internal NotepadDelivery(GooseTaskData task, string answer, Rectangle work, Point origin, IntPtr gooseWindow)
         {
             Task = task;
             this.work = work;
@@ -48,7 +49,10 @@ namespace ClassroomGoose
             window.Load += delegate
             {
                 Native.SetWindowActivation(window.Handle, false);
-                if (closing) window.BeginInvoke(new MethodInvoker(window.Close));
+                if (closing)
+                    window.BeginInvoke(new MethodInvoker(window.Close));
+                else
+                    dragLayer = new DragLayer(window.Handle, gooseWindow);
             };
             window.LocationChanged += delegate { if (!released) ClipToDisplay(); };
             window.FormClosed += delegate { closed = true; };
@@ -78,6 +82,7 @@ namespace ClassroomGoose
             return Dispatch(delegate
             {
                 released = true;
+                if (dragLayer != null) dragLayer.ReleaseHandle();
                 window.Region = null;
                 Native.SetWindowActivation(window.Handle, true);
             });
@@ -90,6 +95,26 @@ namespace ClassroomGoose
             // A dialog thread may have just started, with no handle to post to yet.
             if (closed || stage.GetValue(Task).ToString() != "DraggingWindowBack")
                 window.Dispose();
+        }
+
+        private sealed class DragLayer : NativeWindow
+        {
+            private readonly IntPtr gooseWindow;
+
+            internal DragLayer(IntPtr note, IntPtr gooseWindow)
+            {
+                this.gooseWindow = gooseWindow;
+                AssignHandle(note);
+                Native.PlaceBehindWithoutFocus(note, gooseWindow);
+            }
+
+            protected override void WndProc(ref Message message)
+            {
+                // The original Not-epad requests TopMost on each move, just like the goose.
+                if (message.Msg == Native.WindowPositionChanging)
+                    Native.KeepBehind(message.LParam, gooseWindow);
+                base.WndProc(ref message);
+            }
         }
     }
 }
