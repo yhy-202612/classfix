@@ -49,7 +49,7 @@ namespace ClassroomGoose
             canBePickedRandomly = false;
         }
 
-        internal sealed class WalkData : GooseTaskData { internal bool Holding; }
+        private sealed class WalkData : GooseTaskData { }
 
         public override GooseTaskData GetNewTaskData(GooseEntity goose)
         {
@@ -57,10 +57,7 @@ namespace ClassroomGoose
             return new WalkData();
         }
 
-        public override void RunTask(GooseEntity goose)
-        {
-            goose.extendingNeck = ((WalkData)goose.currentTaskData).Holding;
-        }
+        public override void RunTask(GooseEntity goose) { }
     }
 
     internal interface IGoose : IDisposable
@@ -72,12 +69,15 @@ namespace ClassroomGoose
         event Action Frame;
         void TargetScreen(Rectangle area);
         void ResetPosition(Point point, bool facesRight);
-        bool Move(Point target, bool holding);
+        bool Move(Point target);
         void Wander();
         void Show();
         void Hide();
         void Draw(Graphics graphics);
-        void Honk();
+        void BringNotepad(string answer, Rectangle work);
+        bool IsBringingNotepad { get; }
+        void FinishNotepad();
+        void CloseNotepad();
     }
 
     internal sealed class StockGoose : IGoose
@@ -88,6 +88,7 @@ namespace ClassroomGoose
         private readonly GooseEntity.RenderFunction draw;
         private readonly int classroomWalk;
         private readonly string honkPath;
+        private NotepadDelivery notepad;
         private bool audioOpen;
         private bool shown;
         private bool clickThrough = true;
@@ -144,12 +145,11 @@ namespace ClassroomGoose
             goose.updateRig(goose.rig, goose.position, goose.direction);
         }
 
-        public bool Move(Point target, bool holding)
+        public bool Move(Point target)
         {
             if (goose.currentTask != classroomWalk)
                 API.Goose.setCurrentTaskByID(goose, ClassroomWalk.Id, false);
             goose.targetPos = LocalPoint(target);
-            ((ClassroomWalk.WalkData)goose.currentTaskData).Holding = holding;
             goose.currentAcceleration = goose.parameters.AccelerationNormal;
             if (!API.Goose.isGooseAtTarget(goose, 7)) return false;
             goose.velocity = Vector2.zero;
@@ -193,7 +193,32 @@ namespace ClassroomGoose
             graphics.Restore(saved);
         }
 
-        public void Honk()
+        public void BringNotepad(string answer, Rectangle work)
+        {
+            CloseNotepad();
+            API.Goose.setCurrentTaskByID(goose, "CollectNotepad", false);
+            notepad = new NotepadDelivery(goose.currentTaskData, answer, work, origin);
+        }
+
+        public bool IsBringingNotepad
+        {
+            get { return notepad != null && ReferenceEquals(goose.currentTaskData, notepad.Task); }
+        }
+
+        public void FinishNotepad()
+        {
+            if (notepad != null && notepad.Release()) Honk();
+        }
+
+        public void CloseNotepad()
+        {
+            if (notepad == null) return;
+            if (IsBringingNotepad) Wander();
+            notepad.Close();
+            notepad = null;
+        }
+
+        private void Honk()
         {
             if (!audioOpen)
             {
@@ -210,6 +235,7 @@ namespace ClassroomGoose
 
         public void Dispose()
         {
+            CloseNotepad();
             InjectionPoints.PostUpdateRigEvent -= RenderFrame;
             canvas.MouseClick -= Click;
             if (audioOpen) Native.mciSendString("close evetechDelivery", null, 0, IntPtr.Zero);

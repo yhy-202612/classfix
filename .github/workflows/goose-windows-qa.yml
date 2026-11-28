@@ -19,6 +19,7 @@ jobs:
     env:
       QT_ACCESSIBILITY: '1'
       PYTHONIOENCODING: utf-8
+      EVETECH_AI_KEY: windows-qa-fixture
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,9 +38,11 @@ jobs:
           New-Item -ItemType Directory -Force $env:QA_REPORT | Out-Null
           python goose_setup.py --yes
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -c "from evetech.storage import Store,data_directory; Store(data_directory()).update_settings({'startup_prompted':'1','monitor_enabled':'0','update_check':'0','theme':'dark'})"
+          python -c "from evetech.storage import Store,data_directory; Store(data_directory()).update_settings({'startup_prompted':'1','monitor_enabled':'0','update_check':'0','theme':'dark','ai_url':'https://api.deepseek.com/chat/completions','ai_model':'deepseek-flash'})"
       - name: Build the native Windows distribution
         run: |
+          python tools/windows-qa/fixture_reply.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $gooseFolder = Join-Path $env:EVETECH_DATA_DIR 'desktop-goose\v0.31'
           .\build-exe.ps1 -Python python.exe -DesktopGooseFolder $gooseFolder
       - name: Click Preview Goose in the packaged app and verify the screen pixels

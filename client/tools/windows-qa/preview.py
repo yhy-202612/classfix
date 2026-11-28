@@ -13,7 +13,7 @@ import psutil
 import win32api
 import win32con
 import win32gui
-from pywinauto import Desktop, mouse
+from pywinauto import Desktop, keyboard, mouse
 
 
 user = ctypes.WinDLL("user32", use_last_error=True)
@@ -117,6 +117,58 @@ def check_nest(window):
         win32gui.UnregisterClass(name, instance)
 
 
+def check_text_delivery(window, preview, child_pid):
+    window.set_focus()
+    preview.click_input()
+    time.sleep(0.75)
+    keyboard.send_keys("^%g")
+    bubble = wait_for(lambda: next((item for item in Desktop(backend="uia").windows()
+                                   if item.window_text() == "EveTech · Ask Goose" and item.is_visible()), None))
+    assert bubble is not None, "Text chat did not open"
+    control(bubble, "Type Question").click_input()
+    time.sleep(0.4)
+    editor = bubble.descendants(control_type="Edit")[0]
+    editor.set_edit_text("Why does 2x + 6 = 14 become 2x = 8?")
+    ImageGrab.grab(include_layered_windows=True).save(report / "preview-text-question.png")
+    note_title = 'Goose "Not-epad" · Answer'
+    assert not win32gui.FindWindow(None, note_title), "A note appeared before sending a question"
+    control(bubble, "Send").click_input()
+
+    display = pet_bounds(child_pid)[0]
+    entering = None
+    settled = None
+    frames = []
+    start = time.monotonic()
+    while time.monotonic() - start < 30:
+        note = win32gui.FindWindow(None, note_title)
+        if note and win32gui.IsWindowVisible(note):
+            left, top, right, bottom = win32gui.GetWindowRect(note)
+            effective_width = min(display[2], right) - max(display[0], left)
+            if effective_width > 0:
+                screenshot = ImageGrab.grab(include_layered_windows=True)
+                frames.append(screenshot.resize((768, 576)))
+                if entering is None and 45 < effective_width < right - left - 45:
+                    entering = (left, top, right, bottom)
+                    screenshot.save(report / "preview-notepad-drag.png")
+                    assert win32gui.GetForegroundWindow() != note, "Delivering the note took keyboard focus"
+                if not win32gui.GetWindowLong(note, win32con.GWL_EXSTYLE) & 0x08000000:
+                    if effective_width == right - left:
+                        settled = (left, top, right, bottom)
+                        screenshot.save(report / "preview-notepad-delivered.png")
+                        break
+        time.sleep(0.12)
+
+    assert entering is not None, "Did not see a Not-epad window crossing the display edge"
+    assert settled is not None, "The original Not-epad did not finish delivery inside the display"
+    assert abs(entering[0] - settled[0]) > 45, "The note did not move from its entry point"
+    reply = Desktop(backend="uia").window(handle=note).descendants(control_type="Edit")[0]
+    assert "Subtract 6 from both sides" in reply.get_value(), "The note did not contain the text answer"
+    frames[0].save(report / "preview-notepad-walk.gif", save_all=True, append_images=frames[1:],
+                   duration=140, loop=0, optimize=True)
+    print(f"Original Not-epad crossed the edge {entering} and landed {settled} with the text answer.", flush=True)
+    win32gui.PostMessage(note, win32con.WM_CLOSE, 0, 0)
+
+
 def main():
     exe = Path(sys.argv[1]).resolve()
     child = subprocess.Popen([str(exe)], cwd=exe.parent)
@@ -217,6 +269,7 @@ def main():
             time.sleep(.12)
         frames[0].save(report / "preview-walk.gif", save_all=True, append_images=frames[1:],
                        duration=140, loop=0, optimize=True)
+        check_text_delivery(window, preview, child.pid)
         print("Native goose, chat and Circle Screen all passed.", flush=True)
     except Exception:
         ImageGrab.grab(include_layered_windows=True).save(report / "preview-failure.png")
