@@ -53,7 +53,7 @@ jobs:
             Write-Output $_.Name
             Get-Content -LiteralPath $_.FullName
           }
-          Get-ChildItem -LiteralPath $env:QA_REPORT -Filter 'preview-*.png' | ForEach-Object {
+          Get-ChildItem -LiteralPath $env:QA_REPORT -Filter 'preview-*' | ForEach-Object {
             $encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName))
             for ($offset = 0; $offset -lt $encoded.Length; $offset += 4096) {
               $length = [Math]::Min(4096, $encoded.Length - $offset)

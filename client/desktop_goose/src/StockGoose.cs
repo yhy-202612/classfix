@@ -137,6 +137,8 @@ namespace ClassroomGoose
             goose.position = LocalPoint(point);
             goose.velocity = Vector2.zero;
             goose.direction = facesRight ? 0 : 180;
+            // Clear a step that was in progress before moving between monitors or starting a preview.
+            goose.rig.feets = new ProceduralFeets();
             goose.rig.feets.lFootPos = goose.position;
             goose.rig.feets.rFootPos = goose.position;
             goose.updateRig(goose.rig, goose.position, goose.direction);

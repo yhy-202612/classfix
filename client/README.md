@@ -1,4 +1,4 @@
-# EveTech 1.6.12
+# EveTech 1.7.0
 
 **Classroom Troubleshooting Assistant** · 面向教师与电教委员的 Windows 原生桌面工具。首版支持 Microsoft PowerPoint。
 
@@ -80,7 +80,7 @@ EveTech 的检测为只读。修复由教师通过 PowerPoint 或 Windows 设置
 ### 截图问 AI
 
 1. 点桌鹅，在气泡中选择 **Circle Screen**。也可以右键托盘图标选择「截图问 AI」，或点主窗口顶部的「截图问 AI」。
-2. 在指针所在的显示器上拖出截图范围。在预览里用鼠标或手指圈画，可撤销上一笔或重新截图。
+2. 在指针所在的显示器上拖出范围。拖动选区内部可移动，拖动四角可调整大小。确认选区后再圈画，可撤销、清空圈画或重新截图。
 3. 输入问题，点「发送截图和问题」。确认预览、服务地址和模型后发送，回答会留在窗口里。
 
 在「设置 → AI 辅助分析」使用支持图片输入的 Chat Completions 模型。使用官方 DeepSeek 时，地址填 `https://api.deepseek.com/chat/completions`，模型填 `deepseek-flash`，再填 API 密钥并保存。截图留在内存中，确认前不会发送。 [DeepSeek 图片输入文档](https://api-docs.deepseek.com/guides/vision/)
@@ -88,6 +88,7 @@ EveTech 的检测为只读。修复由教师通过 PowerPoint 或 Windows 设置
 ### Desktop Goose and touch keyboard
 
 - In Settings, open **Desktop Pet** and select **Download & Set Up**. EveTech downloads the original Windows v0.31 ZIP directly from itch.io, verifies it, and enables the goose for your Windows account. If you already have the original ZIP, use **Import Goose ZIP…** or run `EveTechGooseSetup.exe` with that ZIP as its argument. You can also run the downloader by itself and confirm the download. Restart EveTech after using the standalone downloader. [Official Desktop Goose download](https://samperson.itch.io/desktop-goose)
+- EveTech launches the original `GooseDesktop.exe` from a separate, verified copy. Approve the original **Mod Enabler Warning** when the process starts. The classroom Mod keeps the original drawing and Wander task, and excludes random pranks. Your separately installed copy and its settings stay intact.
 - If Windows reports a downloaded file is blocked, select **Download & Set Up** or **Import Goose ZIP…** to install a verified copy. After setup, the EveTech tray menu has **Enable Desktop Goose** and a **Desktop Goose** submenu with **Ask Goose**, **Pause Desktop Goose**, and **Desktop Pet Settings…**.
 - The goose roams quietly during school breaks, eye exercises, group exercises, and lunch break. It walks offscreen when the next class starts. The schedule applies on weekdays by default. **Debug mode: ignore the school schedule** lets the goose roam any time, including weekends.
 - Select **Preview Goose** in **Desktop Pet** to see it for 30 seconds on the display with the Settings window. The status below the button shows whether the helper answered and reports any pause, full-screen, or setup issue.
@@ -176,6 +177,11 @@ $run.ExitCode
 | `tests/` | 单元、Windows 集成与 Qt 操作测试 |
 
 ## 更新记录
+
+### 1.7.0
+
+- Runs the original Desktop Goose v0.31 host with an EveTech classroom Mod and its original renderer and Wander task.
+- Redesigned the compact goose chat. Circle Screen supports move, corner resize and explicit selection confirmation before annotation.
 
 ### 1.6.12
 

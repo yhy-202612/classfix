@@ -10,6 +10,9 @@ import time
 
 from PIL import ImageChops, ImageGrab
 import psutil
+import win32api
+import win32con
+import win32gui
 from pywinauto import Desktop, mouse
 
 
@@ -90,6 +93,28 @@ def visible_goose(pid, before):
             x, y = min(beak, key=lambda p: p[1])
             return screen, (left, top, box[0] + changed[2], box[1] + changed[3]), (left + x, top + y + 2)
     return None
+
+
+def check_nest(window):
+    name = "screenClass"
+    instance = win32api.GetModuleHandle(None)
+    klass = win32gui.WNDCLASS()
+    klass.hInstance = instance
+    klass.lpszClassName = name
+    klass.lpfnWndProc = win32gui.DefWindowProc
+    klass.hbrBackground = win32con.COLOR_WINDOW + 1
+    atom = win32gui.RegisterClass(klass)
+    hwnd = win32gui.CreateWindow(atom, "Test slideshow window", win32con.WS_POPUP, 0, 0, 1024, 768,
+                                 0, 0, instance, None)
+    try:
+        win32gui.ShowWindow(hwnd, win32con.SW_SHOWNOACTIVATE)
+        if not wait_for(lambda: [text for text in desktop_pet_status(window) if "resting in its" in text], 12):
+            raise RuntimeError(f"The native goose did not walk into the nest: {desktop_pet_status(window)!r}")
+        ImageGrab.grab(include_layered_windows=True).save(report / "preview-nest.png")
+        print("Native goose reached the nest for a simulated slideshow window.", flush=True)
+    finally:
+        win32gui.DestroyWindow(hwnd)
+        win32gui.UnregisterClass(name, instance)
 
 
 def main():
@@ -182,6 +207,16 @@ def main():
         if question is None:
             raise RuntimeError("The screenshot annotation window did not open")
         ImageGrab.grab(include_layered_windows=True).save(report / "preview-annotation.png")
+        control(question, "Close").click_input() if control(question, "Close") else question.close()
+        check_nest(window)
+        window.set_focus()
+        preview.click_input()
+        frames = []
+        for _ in range(32):
+            frames.append(ImageGrab.grab(include_layered_windows=True).resize((640, 480)))
+            time.sleep(.12)
+        frames[0].save(report / "preview-walk.gif", save_all=True, append_images=frames[1:],
+                       duration=140, loop=0, optimize=True)
         print("Native goose, chat and Circle Screen all passed.", flush=True)
     except Exception:
         ImageGrab.grab(include_layered_windows=True).save(report / "preview-failure.png")
